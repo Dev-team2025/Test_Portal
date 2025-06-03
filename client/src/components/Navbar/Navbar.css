@@ -1,0 +1,40 @@
+.navbar-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    flex-wrap: wrap;
+}
+
+/* Ensures the logo scales properly */
+.navbar-logo {
+    height: 5rem;
+    max-width: 100%;
+}
+
+/* Adjusts nav layout for smaller screens */
+.nav {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+}
+
+
+
+/* Responsive Design */
+@media screen and (max-width: 768px) {
+    .navbar-container {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .nav {
+        flex-direction: column;
+        text-align: center;
+        padding: 0;
+    }
+
+    .nav-item {
+        width: 100%;
+    }
+}
