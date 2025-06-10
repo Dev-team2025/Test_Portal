@@ -17,10 +17,10 @@ function Landing() {
             <div className="flex flex-col md:flex-row justify-between items-center mt-6 px-4 md:px-10">
                 <img
                     src={image}
-                    className="w-full md:w-[550px] rounded-[30px] md:ml-20"
+                    className="w-full md:w-[450px] rounded-[30px] md:ml-20"
                     alt="Hero Image"
                 />
-                <div className="mt-6 md:mt-0 md:max-w-[700px] text-gray-700">
+                <div className="mt-6 md:mt-0 md:max-w-[500px] text-gray-700">
                     <p className="text-lg">
                         Lorem ipsum dolor sit amet consectetur adipisicing elit. Quasi, impedit aperiam corrupti quo earum ipsam!
                         Fugit tenetur cumque eligendi quibusdam perferendis provident sequi exercitationem nisi, aliquid earum et!

@@ -1,110 +1,106 @@
-const db = require("../config/db");
+// controllers/quizController.js
+const Question = require("../models/Quiz");
+const UserQuizProgress = require("../models/UserQuizProgress");
 
-exports.getQuestions = (req, res) => {
-    const { question_type } = req.query;
+exports.getQuestions = async (req, res) => {
+    try {
+        const userId = req.query.userId || "default_user";
+        const questionCount = 50;
+        const totalQuestions = 1000;
 
-    let query;
-    const queryParams = [];
+        let progress = await UserQuizProgress.findOne({ userId });
 
-    if (question_type && question_type !== 'all') {
-        query = `
-            SELECT question_id, question_text, option_a, option_b, option_c, option_d, 
-                   correct_answer, question_type, topic, ans_desc
-            FROM non_technical_questions
-            WHERE question_type = ?
-            LIMIT 50
-        `;
-        queryParams.push(question_type);
-    } else {
-        query = `
-            SELECT question_id, question_text, option_a, option_b, option_c, option_d, 
-                   correct_answer, question_type, topic, ans_desc
-            FROM non_technical_questions
-            LIMIT 50
-        `;
-    }
+        if (!progress) {
+            progress = await UserQuizProgress.create({ userId, lastOffset: 0 });
+        }
 
-    db.query(query, queryParams, (err, results) => {
-        if (err) return res.status(500).json({ message: "Error fetching questions" });
+        let start = progress.lastOffset;
+        let end = start + questionCount;
+
+        if (end > totalQuestions) {
+            start = 0;
+            end = questionCount;
+        }
+
+        const questions = await Question.find({})
+            .sort({ question_number: 1 })
+            .skip(start)
+            .limit(questionCount);
+
+        await UserQuizProgress.updateOne({ userId }, { lastOffset: end });
 
         res.json({
-            questions: results,
-            question_type: question_type || 'all',
-            isLastBatch: results.length < 50
+            questions,
+            isLastBatch: end >= totalQuestions
         });
-    });
+    } catch (err) {
+        console.error("Error fetching questions:", err);
+        res.status(500).json({ message: "Error fetching questions" });
+    }
 };
 
-exports.submitQuiz = (req, res) => {
-    const { userId, answers, question_type } = req.body;
-    const questionIds = Object.keys(answers);
+exports.submitAnswers = async (req, res) => {
+    try {
+        const { userId, answers, topic } = req.body;
 
-    if (questionIds.length === 0) {
-        return res.status(400).json({ message: "No answers provided" });
-    }
+        // Get all question IDs from the submitted answers
+        const questionIds = Object.keys(answers);
 
-    let query;
-    const queryParams = [questionIds];
+        // Fetch all the questions that were answered
+        const questions = await Question.find({
+            _id: { $in: questionIds }
+        });
 
-    if (question_type && question_type !== 'all') {
-        query = `
-            SELECT question_id, correct_answer, ans_desc 
-            FROM non_technical_questions
-            WHERE question_id IN (?) AND question_type = ?
-        `;
-        queryParams.push(question_type);
-    } else {
-        query = `
-            SELECT question_id, correct_answer, ans_desc 
-            FROM non_technical_questions
-            WHERE question_id IN (?)
-        `;
-    }
+        // Create a map for quick lookup of questions by ID
+        const questionMap = {};
+        questions.forEach(q => {
+            questionMap[q._id.toString()] = q;
+        });
 
-    db.query(query, queryParams, (err, correctAnswers) => {
-        if (err) return res.status(500).json({ message: "Error calculating score" });
-
+        // Calculate score and prepare detailed results
         let score = 0;
         const results = {};
 
-        correctAnswers.forEach(item => {
-            const isCorrect = answers[item.question_id] === item.correct_answer;
-            if (isCorrect) score++;
-            results[item.question_id] = {
+        for (const [questionId, selectedOption] of Object.entries(answers)) {
+            const question = questionMap[questionId];
+            if (!question) continue;
+
+            const isCorrect = question.correct_answer === selectedOption;
+            if (isCorrect) {
+                score += 1; // Each correct answer gives 1 mark
+            }
+
+            results[questionId] = {
+                questionText: question.question_text,
+                selectedOption,
+                correctAnswer: question.correct_answer,
                 isCorrect,
-                correctAnswer: item.correct_answer,
-                explanation: item.ans_desc
+                explanation: question.ans_desc || "No explanation available"
             };
-        });
-
-        res.json({
-            score,
-            total: questionIds.length,
-            results,
-            question_type
-        });
-    });
-};
-
-// ✅ New endpoint to fetch distinct question types
-exports.getQuestionTypes = (req, res) => {
-    const query = `
-        SELECT DISTINCT question_type 
-        FROM non_technical_questions
-        WHERE question_type IS NOT NULL AND question_type != ''
-    `;
-
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Error fetching question types:", err);
-            return res.status(500).json({ message: "Error fetching question types" });
         }
 
-        console.log("Fetched question types:", results);
-        const types = results.map(r => r.question_type);
+        // Here you might want to save the results to the user's progress
+        // For example:
+        await UserQuizProgress.findOneAndUpdate(
+            { userId },
+            {
+                $inc: { totalAttempts: 1, totalCorrect: score },
+                $set: { lastAttempt: new Date() }
+            },
+            { upsert: true }
+        );
+
         res.json({
-            questionTypes: ['all', ...types],
-            status: "success"
+            success: true,
+            score,
+            totalQuestions: questionIds.length,
+            results
         });
-    });
+    } catch (err) {
+        console.error("Error submitting answers:", err);
+        res.status(500).json({
+            success: false,
+            message: "Error submitting answers"
+        });
+    }
 };

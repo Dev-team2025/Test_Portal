@@ -21,12 +21,12 @@ function Features() {
     ];
 
     return (
-        <div className="py-10 px-4">
+        <div className="py-5 px-4">
             <h1 className="text-3xl text-red-800 text-center font-bold mb-8">
                 Features
             </h1>
 
-            <div className="flex flex-wrap justify-center gap-20">
+            <div className="flex flex-wrap justify-center gap-10">
                 {features.map((feature, index) => (
                     <div
                         key={index}

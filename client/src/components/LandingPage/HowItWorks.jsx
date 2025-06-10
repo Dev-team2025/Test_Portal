@@ -32,7 +32,7 @@ function HowItWorks() {
                 How It Works
             </h1>
 
-            <div className="flex flex-wrap justify-center items-center gap-6">
+            <div className="flex flex-wrap justify-center items-center gap-2">
                 {steps.map((step, index) => (
                     <React.Fragment key={index}>
                         <div className="w-64 p-6 bg-white shadow-md rounded-xl text-center hover:scale-105 transition duration-300">

@@ -9,7 +9,8 @@ import Footer from './components/footer/Footer';
 import Charts from './components/charts/Charts';
 import Result from './components/charts/Result';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import AdminDashboard from './components/dashboard/AdminDashboard';
+
+import Analyse from './components/dashboard/Analyse';
 
 function App() {
   return (
@@ -38,14 +39,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admindashboard"
-          element={
-            <ProtectedRoute adminOnly={true}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
+
         <Route
           path="/features"
           element={
@@ -67,6 +61,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Result />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analyse/:userId"
+          element={
+            <ProtectedRoute>
+              <Analyse />
             </ProtectedRoute>
           }
         />

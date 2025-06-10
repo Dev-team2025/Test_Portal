@@ -1,19 +1,50 @@
-const db = require('../config/db');
+const mongoose = require("mongoose");
 
-const getQuestionsBySetId = (setId) => {
-    return new Promise((resolve, reject) => {
-        const query = `
-            SELECT id, question_text, option_a, option_b, option_c, option_d, correct_option
-            FROM questions
-            WHERE quiz_id = ?
-        `;
-        db.query(query, [setId], (err, results) => {
-            if (err) reject(err);
-            resolve(results);
-        });
-    });
-};
+const questionSchema = new mongoose.Schema({
+    question_number: {
+        type: Number,
+        required: true,
+        unique: true,
+    },
+    question_text: {
+        type: String,
+        required: true,
+    },
+    option_a: {
+        type: String,
+        required: true,
+    },
+    option_b: {
+        type: String,
+        required: true,
+    },
+    option_c: {
+        type: String,
+        required: true,
+    },
+    option_d: {
+        type: String,
+        required: true,
+    },
+    correct_answer: {
+        type: String,
+        required: true,
+        enum: ["A", "B", "C", "D"],
+    },
+    question_type: {
+        type: String,
+        default: "MCQ",
+    },
+    topic: {
+        type: String,
+        required: true,
+    },
+    ans_desc: {
+        type: String,
+    },
+}, {
+    collection: "non_technical_questions1",
+    timestamps: true, // adds createdAt and updatedAt
+});
 
-module.exports = {
-    getQuestionsBySetId,
-};
+module.exports = mongoose.model("Question", questionSchema);
