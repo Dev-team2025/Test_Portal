@@ -33,21 +33,23 @@ export default function Dashboard() {
         { day: 5, label: "Friday" }
     ];
 
-    // ✅ Only unlock today's or future quizzes
-    const getQuizStatus = (quizDay) => {
-        return quizDay >= currentDay;
+    // 🕙 Allow quizzes until Sunday 10 PM of this week
+    const getQuizStatus = () => {
+        const sunday10PM = new Date(today);
+        sunday10PM.setDate(today.getDate() + (7 - currentDay));
+        sunday10PM.setHours(22, 0, 0, 0);
+        return new Date() <= sunday10PM;
     };
 
     const quizzes = quizDays.map(({ day, label }) => {
         const quizDate = new Date(today);
-        const dayDifference = day - currentDay;
-        quizDate.setDate(today.getDate() + dayDifference);
+        const startOfWeek = today.getDate() - currentDay + day;
+        quizDate.setDate(startOfWeek); // Always get this week's Monday/Wed/Fri
 
-        const isActive = getQuizStatus(day);
         return {
             key: `${currentYear}-${currentMonth + 1}-${quizDate.getDate()}`,
             label,
-            isActive,
+            isActive: getQuizStatus(),
             date: quizDate.toDateString()
         };
     });
@@ -88,7 +90,7 @@ export default function Dashboard() {
                             {quiz.label} Test
                         </h2>
                         <p className={!quiz.isActive ? "text-sm text-red-500 font-semibold" : "text-gray-900"}>
-                            {quiz.isActive ? "🟢 Test Available" : "🔒 Test Finished"}
+                            {quiz.isActive ? "🟢 Test Available until Sunday 10 PM" : "🔒 Test Locked"}
                         </p>
                     </div>
                 ))}

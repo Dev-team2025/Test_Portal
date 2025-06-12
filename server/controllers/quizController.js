@@ -3,7 +3,7 @@ const UserQuizProgress = require("../models/UserQuizProgress");
 const moment = require('moment');
 
 // Configuration
-const QUESTIONS_PER_WEEK = 50;
+const QUESTIONS_PER_WEEK = 20;
 const TOTAL_QUESTIONS = 1000;
 
 // Helper function to shuffle array
