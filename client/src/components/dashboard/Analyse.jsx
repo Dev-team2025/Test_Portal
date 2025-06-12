@@ -13,13 +13,13 @@ const Analyse = ({ userId }) => {
     return (
         <div>
             <h2>📊 Analysis Report</h2>
-            <table border="1">
+            <table border="1" style={{ width: "100%" }}>
                 <thead>
                     <tr>
-                        <th>Question #</th>
-                        <th>Question</th>
-                        <th>Correct Answer</th>
-                        <th>Your Answer</th>
+                        <th style={{ width: "10%" }}>Question #</th>
+                        <th style={{ width: "60%" }}>Question</th>
+                        <th style={{ width: "15%" }}>Correct Answer</th>
+                        <th style={{ width: "15%" }}>Your Answer</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -35,6 +35,7 @@ const Analyse = ({ userId }) => {
                     ))}
                 </tbody>
             </table>
+
         </div>
     );
 };

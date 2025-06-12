@@ -6,8 +6,11 @@ import ErrorIcon from "@mui/icons-material/Error";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Analyse from "../dashboard/Analyse";
+import AlertMessage from "../AlertMessage/AlertMessage";
+import { useAuth } from '../../components/context/AuthContext'
 
 const Quiz = () => {
+    const { user } = useAuth();
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState({});
@@ -19,12 +22,12 @@ const Quiz = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const userId = "student_123";
-
     useEffect(() => {
+        if (!user) return;
+
         setLoading(true);
         axios
-            .get(`http://localhost:5000/api/quiz/questions?userId=${userId}`)
+            .get(`http://localhost:5000/api/quiz/questions?userId=${user._id}`)
             .then((res) => {
                 setQuestions(res.data.questions);
                 setLoading(false);
@@ -34,13 +37,23 @@ const Quiz = () => {
                 setError("Failed to load questions. Please try again.");
                 setLoading(false);
             });
-    }, []);
+    }, [user]);
 
     const handleAnswerSelect = (questionId, selectedOption) => {
         setAnswers((prev) => ({ ...prev, [questionId]: selectedOption }));
     };
 
     const handleSubmitTest = () => {
+        if (!user) {
+            Swal.fire({
+                icon: "error",
+                title: "Authentication Error",
+                text: "Please login to submit the quiz",
+                confirmButtonColor: "#3085d6",
+            });
+            return;
+        }
+
         if (!Object.keys(answers).length) {
             Swal.fire({
                 icon: "warning",
@@ -53,7 +66,7 @@ const Quiz = () => {
 
         axios
             .post("http://localhost:5000/api/quiz/submit", {
-                userId,
+                userId: user._id,
                 answers,
                 topic,
             })
@@ -80,7 +93,7 @@ const Quiz = () => {
             });
     };
 
-    // 🚫 Anti-Cheating Features
+    // Anti-Cheating Features
     useEffect(() => {
         const handleCopyPaste = (e) => {
             e.preventDefault();
@@ -127,23 +140,36 @@ const Quiz = () => {
         };
     }, [submitted, answers]);
 
-    if (loading)
+    if (!user) {
+        return (
+            <div className="flex justify-center items-center h-screen text-lg">
+                🔒 Please login to access the quiz
+            </div>
+        );
+    }
+
+    if (loading) {
         return (
             <div className="flex justify-center items-center h-screen text-lg">
                 🔄 Loading questions...
             </div>
         );
-    if (error)
+    }
+
+    if (error) {
         return <div className="text-center text-red-500 text-lg">{error}</div>;
-    if (!questions.length)
+    }
+
+    if (!questions.length) {
         return (
             <div className="text-center text-gray-500 text-lg">
                 🚫 No questions found.
             </div>
         );
+    }
 
     return (
-        <div className="max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-lg">
+        <div className="max-w-6xl mx-auto p-6 bg-white shadow-lg rounded-lg mt-4">
             {submitted ? (
                 <div className="space-y-6">
                     <div className="text-center flex flex-col items-center">
@@ -258,94 +284,109 @@ const Quiz = () => {
 
                     {showAnalysis && (
                         <div className="mt-6">
-                            <Analyse userId={userId} />
+                            <Analyse userId={user._id} />
                         </div>
                     )}
                 </div>
             ) : (
                 <>
-                    <Card className="mb-4">
-                        <CardHeader>
-                            <h3 className="text-xl font-bold">
-                                Question {currentQuestionIndex + 1} of{" "}
-                                {questions.length}
-                            </h3>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-gray-700">
-                                {
-                                    questions[currentQuestionIndex]
-                                        ?.question_text
-                                }
-                            </p>
-                            <ul className="mt-4">
-                                {["A", "B", "C", "D"].map((option) => (
-                                    <li key={option} className="mb-2">
-                                        <label className="flex items-center space-x-2">
-                                            <input
-                                                type="radio"
-                                                name={`question-${questions[
-                                                    currentQuestionIndex
-                                                ]?._id}`}
-                                                value={option}
-                                                checked={
-                                                    answers[
-                                                    questions[
-                                                        currentQuestionIndex
-                                                    ]?._id
-                                                    ] === option
-                                                }
-                                                onChange={() =>
-                                                    handleAnswerSelect(
-                                                        questions[
-                                                            currentQuestionIndex
-                                                        ]?._id,
-                                                        option
-                                                    )
-                                                }
-                                            />
-                                            <span>
-                                                {
-                                                    questions[
-                                                    currentQuestionIndex
-                                                    ][
-                                                    `option_${option.toLowerCase()}`
-                                                    ]
-                                                }
-                                            </span>
-                                        </label>
-                                    </li>
-                                ))}
-                            </ul>
-                        </CardContent>
-                    </Card>
+                    <AlertMessage />
+                    <div className="flex flex-col md:flex-row gap-6 items-stretch">
+                        {/* Question Panel - Centered Content */}
+                        <Card className="flex-1 bg-blue-50 flex flex-col">
+                            <CardHeader className="text-center">
+                                <h3 className="text-xl font-bold">
+                                    Question {currentQuestionIndex + 1} of{" "}
+                                    {questions.length}
+                                </h3>
+                            </CardHeader>
+                            <CardContent className="p-6 flex-grow flex items-center justify-center">
+                                <p className="text-gray-700 text-lg text-center">
+                                    {
+                                        questions[currentQuestionIndex]
+                                            ?.question_text
+                                    }
+                                </p>
+                            </CardContent>
+                        </Card>
 
-                    <div className="flex justify-between">
+                        {/* Options Panel - Centered Content */}
+                        <Card className="flex-1 bg-green-50 flex flex-col">
+                            <CardHeader className="text-center">
+                                <h3 className="text-xl font-bold">Options</h3>
+                            </CardHeader>
+                            <CardContent className="p-6 flex-grow flex flex-col justify-center">
+                                <ul className="space-y-4 w-full">
+                                    {["A", "B", "C", "D"].map((option) => (
+                                        <li key={option} className="w-full">
+                                            <label className="block w-full">
+                                                <div className={`p-4 rounded-lg transition-all w-full ${answers[questions[currentQuestionIndex]?._id] === option
+                                                    ? "bg-indigo-100 border-2 border-indigo-400"
+                                                    : "bg-white border border-gray-300 hover:bg-indigo-50"}`}>
+                                                    <div className="flex items-center space-x-3 justify-center">
+                                                        <input
+                                                            type="radio"
+                                                            name={`question-${questions[currentQuestionIndex]?._id}`}
+                                                            value={option}
+                                                            checked={
+                                                                answers[
+                                                                questions[
+                                                                    currentQuestionIndex
+                                                                ]?._id
+                                                                ] === option
+                                                            }
+                                                            onChange={() =>
+                                                                handleAnswerSelect(
+                                                                    questions[
+                                                                        currentQuestionIndex
+                                                                    ]?._id,
+                                                                    option
+                                                                )
+                                                            }
+                                                            className="h-5 w-5 text-indigo-600"
+                                                        />
+                                                        <span className="font-medium text-center">
+                                                            {option}.{" "}
+                                                            {
+                                                                questions[
+                                                                currentQuestionIndex
+                                                                ][
+                                                                `option_${option.toLowerCase()}`
+                                                                ]
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div className="flex justify-between mt-6">
                         <Button
-                            onClick={() =>
-                                setCurrentQuestionIndex((prev) => prev - 1)
-                            }
+                            onClick={() => setCurrentQuestionIndex((prev) => prev - 1)}
                             disabled={currentQuestionIndex === 0}
-                            className="bg-gray-400 hover:bg-gray-500 px-4 py-2 rounded"
+                            className="bg-gray-400 hover:bg-gray-500 px-4 py-2 rounded flex items-center"
                         >
-                            ⬅️ Previous
+                            <i className="fa-solid fa-arrow-left mr-2"></i> Previous
                         </Button>
 
                         {currentQuestionIndex < questions.length - 1 ? (
                             <Button
-                                onClick={() =>
-                                    setCurrentQuestionIndex((prev) => prev + 1)
-                                }
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                                onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center"
                             >
-                                Next ➡️
+                                Next <i className="fa-solid fa-arrow-right ml-2"></i>
                             </Button>
                         ) : (
                             <Button
                                 onClick={handleSubmitTest}
-                                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+                                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded flex items-center"
                             >
-                                Submit Quiz ✅
+                                Submit Quiz <i className="fa-solid fa-check ml-2"></i>
                             </Button>
                         )}
                     </div>

@@ -1,11 +1,10 @@
-// routes/quizRoutes.js
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const quizController = require("../controllers/quizController");
+const quizController = require('../controllers/quizController');
 
-// ✅ Attach route handlers
-router.get("/questions", quizController.getQuestions);
-router.post("/submit", quizController.submitAnswers);
+// Quiz routes
+router.get('/questions', quizController.getQuestions);
+router.post('/submit', quizController.submitAnswers);
+router.get('/progress', quizController.getUserProgress);
 
-// ✅ EXPORT the router
 module.exports = router;

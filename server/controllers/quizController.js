@@ -1,37 +1,55 @@
-// controllers/quizController.js
 const Question = require("../models/Quiz");
 const UserQuizProgress = require("../models/UserQuizProgress");
+const moment = require('moment');
 
+// Configuration
+const QUESTIONS_PER_WEEK = 50;
+const TOTAL_QUESTIONS = 1000;
+
+// Helper function to shuffle array
+function shuffleArray(array) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+}
+
+// Get questions for current week
 exports.getQuestions = async (req, res) => {
     try {
         const userId = req.query.userId || "default_user";
-        const questionCount = 50;
-        const totalQuestions = 1000;
+        const currentWeek = moment().isoWeek();
 
-        let progress = await UserQuizProgress.findOne({ userId });
+        // Calculate question range for this week
+        const startQuestion = ((currentWeek - 1) * QUESTIONS_PER_WEEK) % TOTAL_QUESTIONS;
+        const endQuestion = startQuestion + QUESTIONS_PER_WEEK;
+        const questionNumbers = Array.from(
+            { length: QUESTIONS_PER_WEEK },
+            (_, i) => (startQuestion + i) % TOTAL_QUESTIONS + 1
+        );
 
-        if (!progress) {
-            progress = await UserQuizProgress.create({ userId, lastOffset: 0 });
+        // Check if user has already completed this week
+        const progress = await UserQuizProgress.findOne({ userId });
+        if (progress && progress.completedWeeks.includes(currentWeek)) {
+            return res.status(400).json({
+                message: `You have already completed week ${currentWeek}'s quiz`
+            });
         }
 
-        let start = progress.lastOffset;
-        let end = start + questionCount;
+        // Get questions for this week
+        const questions = await Question.find({
+            question_number: { $in: questionNumbers }
+        });
 
-        if (end > totalQuestions) {
-            start = 0;
-            end = questionCount;
-        }
-
-        const questions = await Question.find({})
-            .sort({ question_number: 1 })
-            .skip(start)
-            .limit(questionCount);
-
-        await UserQuizProgress.updateOne({ userId }, { lastOffset: end });
+        // Shuffle questions for this user
+        const shuffledQuestions = shuffleArray(questions);
 
         res.json({
-            questions,
-            isLastBatch: end >= totalQuestions
+            questions: shuffledQuestions,
+            currentWeek,
+            totalQuestions: QUESTIONS_PER_WEEK
         });
     } catch (err) {
         console.error("Error fetching questions:", err);
@@ -39,9 +57,10 @@ exports.getQuestions = async (req, res) => {
     }
 };
 
+// Submit answers
 exports.submitAnswers = async (req, res) => {
     try {
-        const { userId, answers, topic } = req.body;
+        const { userId, answers, currentWeek } = req.body;
 
         // Get all question IDs from the submitted answers
         const questionIds = Object.keys(answers);
@@ -51,50 +70,48 @@ exports.submitAnswers = async (req, res) => {
             _id: { $in: questionIds }
         });
 
-        // Create a map for quick lookup of questions by ID
-        const questionMap = {};
-        questions.forEach(q => {
-            questionMap[q._id.toString()] = q;
-        });
-
-        // Calculate score and prepare detailed results
+        // Calculate score and prepare results
         let score = 0;
         const results = {};
+        const questionMap = {};
 
-        for (const [questionId, selectedOption] of Object.entries(answers)) {
-            const question = questionMap[questionId];
-            if (!question) continue;
+        questions.forEach(q => {
+            questionMap[q._id.toString()] = q;
+            const selectedOption = answers[q._id];
+            const isCorrect = q.correct_answer === selectedOption;
 
-            const isCorrect = question.correct_answer === selectedOption;
-            if (isCorrect) {
-                score += 1; // Each correct answer gives 1 mark
-            }
+            if (isCorrect) score += 1;
 
-            results[questionId] = {
-                questionText: question.question_text,
+            results[q._id] = {
+                questionText: q.question_text,
                 selectedOption,
-                correctAnswer: question.correct_answer,
+                correctAnswer: q.correct_answer,
                 isCorrect,
-                explanation: question.ans_desc || "No explanation available"
+                explanation: q.ans_desc || "No explanation available"
             };
-        }
+        });
 
-        // Here you might want to save the results to the user's progress
-        // For example:
+        // Update user progress
         await UserQuizProgress.findOneAndUpdate(
             { userId },
             {
-                $inc: { totalAttempts: 1, totalCorrect: score },
+                $addToSet: { completedWeeks: currentWeek },
+                $inc: {
+                    totalAttempts: 1,
+                    totalCorrect: score,
+                    [`weeklyScores.${currentWeek}`]: score
+                },
                 $set: { lastAttempt: new Date() }
             },
-            { upsert: true }
+            { upsert: true, new: true }
         );
 
         res.json({
             success: true,
             score,
             totalQuestions: questionIds.length,
-            results
+            results,
+            currentWeek
         });
     } catch (err) {
         console.error("Error submitting answers:", err);
@@ -102,5 +119,32 @@ exports.submitAnswers = async (req, res) => {
             success: false,
             message: "Error submitting answers"
         });
+    }
+};
+
+// Get user progress
+exports.getUserProgress = async (req, res) => {
+    try {
+        const userId = req.query.userId;
+        const progress = await UserQuizProgress.findOne({ userId });
+
+        if (!progress) {
+            return res.json({
+                completedWeeks: [],
+                totalAttempts: 0,
+                totalCorrect: 0,
+                weeklyScores: {}
+            });
+        }
+
+        res.json({
+            completedWeeks: progress.completedWeeks,
+            totalAttempts: progress.totalAttempts,
+            totalCorrect: progress.totalCorrect,
+            weeklyScores: progress.weeklyScores || {}
+        });
+    } catch (err) {
+        console.error("Error fetching user progress:", err);
+        res.status(500).json({ message: "Error fetching progress" });
     }
 };
