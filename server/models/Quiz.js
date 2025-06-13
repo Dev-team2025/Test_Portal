@@ -33,18 +33,23 @@ const questionSchema = new mongoose.Schema({
     },
     question_type: {
         type: String,
-        default: "MCQ",
+        default: "Non Technical",
     },
     topic: {
         type: String,
-        required: true,
+        default: "", // Optional
     },
     ans_desc: {
         type: String,
+        default: "", // Optional
+    },
+    set: {
+        type: Number, // You can change to Number if set is numeric
+        required: true,
     },
 }, {
-    collection: "non_technical_questions1",
-    timestamps: true, // adds createdAt and updatedAt
+    collection: "mcq_questions",
+    timestamps: true,
 });
 
 module.exports = mongoose.model("Question", questionSchema);

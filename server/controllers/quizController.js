@@ -1,10 +1,11 @@
 const Question = require("../models/Quiz");
 const UserQuizProgress = require("../models/UserQuizProgress");
 const moment = require('moment');
+const UserAnswer = require('../models/UserAnswer')
 
 // Configuration
 const QUESTIONS_PER_WEEK = 20;
-const TOTAL_QUESTIONS = 1000;
+const TOTAL_QUESTIONS = 1926;
 
 // Helper function to shuffle array
 function shuffleArray(array) {
@@ -105,6 +106,113 @@ exports.submitAnswers = async (req, res) => {
             },
             { upsert: true, new: true }
         );
+        const Question = require("../models/Quiz");
+        const UserQuizProgress = require("../models/UserQuizProgress");
+        const UserAnswer = require("../models/UserAnswer");
+
+        // Shuffle helper
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // Get quiz questions by set number
+        exports.getSetQuestions = async (req, res) => {
+            try {
+                const userId = req.query.userId;
+                if (!userId) return res.status(400).json({ message: "Missing userId" });
+
+                const progress = await UserQuizProgress.findOne({ userId }) || { completedSets: [] };
+                const nextSet = (Math.max(...progress.completedSets, 0)) + 1;
+
+                const questions = await Question.find({ set: nextSet });
+
+                if (!questions.length) {
+                    return res.status(404).json({ message: `No questions found for Set ${nextSet}` });
+                }
+
+                const shuffledQuestions = shuffleArray(questions);
+
+                res.json({
+                    set: nextSet,
+                    totalQuestions: questions.length,
+                    questions: shuffledQuestions
+                });
+
+            } catch (err) {
+                console.error("Error fetching set questions:", err);
+                res.status(500).json({ message: "Internal server error" });
+            }
+        };
+
+        // Submit quiz answers
+        exports.submitSetAnswers = async (req, res) => {
+            try {
+                const { userId, answers, set } = req.body;
+
+                if (!userId || !answers || !set) {
+                    return res.status(400).json({ message: "Missing userId, answers, or set" });
+                }
+
+                const questionIds = Object.keys(answers);
+                const questions = await Question.find({ _id: { $in: questionIds } });
+
+                let score = 0;
+                const results = {};
+
+                for (const question of questions) {
+                    const selectedOption = answers[question._id];
+                    const isCorrect = question.correct_answer === selectedOption;
+
+                    if (isCorrect) score++;
+
+                    results[question._id] = {
+                        questionText: question.question_text,
+                        selectedOption,
+                        correctAnswer: question.correct_answer,
+                        isCorrect,
+                        explanation: question.ans_desc || ""
+                    };
+
+                    await UserAnswer.create({
+                        userId,
+                        questionId: question._id,
+                        selectedOption,
+                        isCorrect
+                    });
+                }
+
+                await UserQuizProgress.findOneAndUpdate(
+                    { userId },
+                    {
+                        $addToSet: { completedSets: set },
+                        $inc: {
+                            totalAttempts: 1,
+                            totalCorrect: score,
+                            [`setScores.${set}`]: score
+                        },
+                        $set: { lastAttempt: new Date() }
+                    },
+                    { upsert: true, new: true }
+                );
+
+                res.json({
+                    success: true,
+                    set,
+                    score,
+                    totalQuestions: questionIds.length,
+                    results
+                });
+
+            } catch (err) {
+                console.error("Error submitting set answers:", err);
+                res.status(500).json({ message: "Server error while submitting answers" });
+            }
+        };
 
         res.json({
             success: true,
@@ -146,5 +254,50 @@ exports.getUserProgress = async (req, res) => {
     } catch (err) {
         console.error("Error fetching user progress:", err);
         res.status(500).json({ message: "Error fetching progress" });
+    }
+};
+exports.submitQuiz = async (req, res) => {
+    try {
+        const { userId, answers } = req.body;
+
+        if (!userId || !answers) {
+            return res.status(400).json({ message: "Missing userId or answers" });
+        }
+
+        let score = 0;
+        const results = {};
+
+        // Save each answer and calculate score
+        for (const [questionId, selectedOption] of Object.entries(answers)) {
+            const question = await Question.findById(questionId);
+
+            if (!question) continue;
+
+            const isCorrect = question.correct_answer === selectedOption;
+
+            if (isCorrect) score++;
+
+            results[questionId] = {
+                isCorrect,
+                explanation: question.explanation || ""
+            };
+
+            await UserAnswer.create({
+                userId,
+                questionId,
+                selectedOption,
+                isCorrect
+            });
+        }
+
+        res.status(200).json({
+            message: "Quiz submitted successfully",
+            score,
+            results
+        });
+
+    } catch (error) {
+        console.error("Error in quiz submission:", error);
+        res.status(500).json({ message: "Server error during quiz submission" });
     }
 };

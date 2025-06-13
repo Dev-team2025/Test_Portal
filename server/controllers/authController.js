@@ -1,10 +1,12 @@
+// server/controllers/authController.js
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
+// Auth functions
 exports.register = async (req, res) => {
-    const { username, fullname, usn, branch, yop, email, password } = req.body;
+    const { username, fullname, usn, branch, yop, email, password, user_type } = req.body;
 
     if (!username || !fullname || !usn || !branch || !yop || !email || !password) {
         return res.status(400).json({ message: "❌ All fields are required" });
@@ -15,10 +17,19 @@ exports.register = async (req, res) => {
         if (existingUser) return res.status(400).json({ message: "❌ User already exists" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, fullname, usn, branch, yop, email, password: hashedPassword });
-        const savedUser = await newUser.save();
+        const newUser = new User({
+            username,
+            fullname,
+            usn,
+            branch,
+            yop,
+            email,
+            password: hashedPassword,
+            user_type: user_type || 'user'
+        });
 
-        res.status(201).json({ message: "✅ User registered successfully", userId: savedUser._id });
+        const savedUser = await newUser.save();
+        res.status(201).json({ message: "✅ User registered successfully", user: savedUser });
     } catch (err) {
         res.status(500).json({ message: "❌ Registration failed", error: err.message });
     }
@@ -59,18 +70,92 @@ exports.login = async (req, res) => {
         res.status(500).json({ message: "❌ Login failed", error: err.message });
     }
 };
-// authController.js
-exports.verifyToken = async (req, res) => {
+//verify admin
+exports.verifyAdmin = async (req, res, next) => {
+    try {
+        if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+        if (user.user_type !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Admin access required' });
+        }
+
+        next();
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+//verify tokens 
+exports.verifyToken = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token provided' });
+    if (!token) return res.status(401).json({ success: false, message: 'No token provided' });
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.id).select('-password');
-        if (!user) return res.status(404).json({ message: 'User not found' });
-
-        res.json({ user });
+        req.user = decoded;
+        next();
     } catch (err) {
-        res.status(401).json({ message: 'Invalid token' });
+        res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+};
+// User management functions
+exports.getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find().select('-password -__v');
+        res.status(200).json({ success: true, data: users });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch users", error: err.message });
+    }
+};
+
+exports.getUserById = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password -__v');
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        res.status(200).json({ success: true, data: user });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch user", error: err.message });
+    }
+};
+
+exports.updateUser = async (req, res) => {
+    try {
+        const { password, ...updateData } = req.body;
+
+        if (password) {
+            updateData.password = await bcrypt.hash(password, 10);
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true, runValidators: true }
+        ).select('-password -__v');
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        res.status(200).json({ success: true, message: "User updated successfully", data: updatedUser });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to update user", error: err.message });
+    }
+};
+
+
+
+exports.deleteUser = async (req, res) => {
+    try {
+        const deletedUser = await User.findByIdAndDelete(req.params.id);
+        if (!deletedUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        res.status(200).json({ success: true, message: "User deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to delete user", error: err.message });
     }
 };

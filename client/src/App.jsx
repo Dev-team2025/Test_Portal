@@ -11,6 +11,8 @@ import Result from './components/charts/Result';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import Analyse from './components/dashboard/Analyse';
+import AdminDashboard from './components/dashboard/AdminDashboard';
+import UsersManagement from './components/AdminAccessDetails/UsersManagement';
 
 function App() {
   return (
@@ -28,6 +30,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admindashboard"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute>
+              <UsersManagement />
             </ProtectedRoute>
           }
         />
