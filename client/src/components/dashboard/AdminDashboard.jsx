@@ -13,15 +13,15 @@ export default function AdminDashboard() {
         },
         {
             title: "Report Generation",
-            description: "Generate Reports by Colleage Name or Department Name.",
+            description: "Generate reports by college name or department name.",
             image: reportIcon,
             link: "/admin/reports"
         },
         {
-            title: "Top Scorer",
-            description: "Modify system configurations and preferences.",
+            title: "Questions Management",
+            description: "Add, edit, or upload questions and manage quiz settings.",
             image: settingsIcon,
-            link: "/admin/settings"
+            link: "/admin/settings" // Keep this as is
         }
     ];
 
@@ -45,9 +45,9 @@ export default function AdminDashboard() {
                         <p className="text-gray-900">{card.description}</p>
                         <a
                             href={card.link}
-                            className="mt-4 px-4 py-2 text-white bg-red-800 rounded-lg hover:bg-red-600"
+                            className="mt-4 px-4 py-2 text-white bg-red-800 rounded-lg hover:bg-green-600"
                         >
-                            Go to {card.title}
+                            {card.title}
                         </a>
                     </div>
                 ))}

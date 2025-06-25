@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { FaTrash, FaEye, FaEdit } from "react-icons/fa";
+import { FaTrash, FaEdit, FaUpload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import * as XLSX from "xlsx";
 
 function UsersManagement() {
     const [users, setUsers] = useState([]);
@@ -17,12 +18,9 @@ function UsersManagement() {
             try {
                 setLoading(true);
                 const response = await axios.get("http://localhost:5000/api/auth/users", {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
+                    headers: { Authorization: `Bearer ${token}` }
                 });
 
-                // ✅ Fix: Correctly access the users array from the API response
                 setUsers(response.data.data);
                 setError(null);
             } catch (err) {
@@ -54,9 +52,7 @@ function UsersManagement() {
         try {
             setActionLoading(true);
             await axios.delete(`http://localhost:5000/api/auth/users/${id}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
+                headers: { Authorization: `Bearer ${token}` }
             });
             setUsers(users.filter(user => user._id !== id));
             Swal.fire("Deleted!", "User has been deleted.", "success");
@@ -68,8 +64,36 @@ function UsersManagement() {
         }
     };
 
-    const handleView = (id) => navigate(`/users/${id}`);
-    const handleEdit = (id) => navigate(`/users/edit/${id}`);
+    const handleEdit = (id) => {
+        navigate(`/admin/users/edit/${id}`);
+    };
+
+    const handleFileUpload = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: "array" });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const usersFromExcel = XLSX.utils.sheet_to_json(sheet);
+
+            try {
+                const response = await axios.post(
+                    "http://localhost:5000/api/auth/users/bulk",
+                    { users: usersFromExcel },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                Swal.fire("Success", response.data.message, "success");
+                setUsers(prev => [...prev, ...response.data.insertedUsers]);
+            } catch (error) {
+                console.error(error);
+                Swal.fire("Error", error.response?.data?.message || "Failed to upload users", "error");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
 
     if (loading) {
         return (
@@ -93,6 +117,14 @@ function UsersManagement() {
     return (
         <div className="p-10 max-w-screen-lg mx-auto">
             <h1 className="text-2xl font-bold text-center mb-8">Users Management</h1>
+
+            <div className="mb-6 flex items-center justify-between">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                    <FaUpload className="text-blue-600" />
+                    <span className="text-blue-600 font-semibold">Upload Excel</span>
+                    <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
+                </label>
+            </div>
 
             <div className="overflow-x-auto">
                 <table className="min-w-full bg-white border border-gray-300 rounded-lg overflow-hidden">
@@ -121,14 +153,6 @@ function UsersManagement() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button
-                                            onClick={() => handleView(user._id)}
-                                            className="text-blue-600 hover:text-blue-900 mr-4"
-                                            title="View"
-                                            disabled={actionLoading}
-                                        >
-                                            <FaEye />
-                                        </button>
                                         <button
                                             onClick={() => handleEdit(user._id)}
                                             className="text-yellow-600 hover:text-yellow-900 mr-4"

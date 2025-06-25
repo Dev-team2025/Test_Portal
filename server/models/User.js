@@ -9,7 +9,9 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     user_type: { type: String, default: "user" },
-    created_at: { type: Date, default: Date.now }
+    college: { type: String, required: false }, // ✅ New field added here
+    created_at: { type: Date, default: Date.now },
+    isFirstLogin: { type: Boolean, default: true },
 });
 
 module.exports = mongoose.model("User", userSchema);

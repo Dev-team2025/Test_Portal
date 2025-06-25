@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { jwtDecode } from "jwt-decode";
 
 // Sweeticons2 (Lucide)
 import {
@@ -32,9 +33,13 @@ export default function AuthTabs() {
 
         try {
             const response = await axios.post("http://localhost:5000/api/login", { email, password });
+            const token = response.data.token;
 
-            localStorage.setItem("token", response.data.token);
-            localStorage.setItem("userId", response.data.userId);
+            const decoded = jwtDecode(token);
+            console.log("Decoded JWT:", decoded);
+
+            localStorage.setItem("token", token);
+            localStorage.setItem("userId", response.data.userId); // Safer!
             localStorage.setItem("username", response.data.username);
             localStorage.setItem("email", response.data.email);
             localStorage.setItem("userType", response.data.userType);
@@ -44,6 +49,7 @@ export default function AuthTabs() {
             setError("❌ Invalid credentials or user not found.");
         }
     };
+
 
     const handleSignup = async (e) => {
         e.preventDefault();
@@ -78,9 +84,9 @@ export default function AuthTabs() {
                         : "bg-white text-black"
                         }`}
                 >
-                    Login
+                    WelCome
                 </button>
-                <button
+                {/* <button
                     onClick={() => setActiveTab("signup")}
                     className={`px-5 py-2 rounded-lg font-semibold transition duration-300 ${activeTab === "signup"
                         ? "bg-red-800 text-white"
@@ -88,7 +94,7 @@ export default function AuthTabs() {
                         }`}
                 >
                     Sign Up
-                </button>
+                </button> */}
             </div>
 
             {error && <p className="text-red-400 text-center mb-4">{error}</p>}

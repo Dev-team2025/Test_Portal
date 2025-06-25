@@ -159,3 +159,58 @@ exports.deleteUser = async (req, res) => {
         res.status(500).json({ success: false, message: "Failed to delete user", error: err.message });
     }
 };
+exports.bulkUploadUsers = async (req, res) => {
+    try {
+        const users = req.body.users;
+
+        if (!Array.isArray(users) || users.length === 0) {
+            return res.status(400).json({ message: "No user data provided" });
+        }
+
+        // Step 1: Extract all emails from the incoming data
+        const emails = users.map(user => user.email);
+
+        // Step 2: Find existing users with these emails
+        const existingUsers = await User.find({ email: { $in: emails } }).select("email");
+        const existingEmailSet = new Set(existingUsers.map(user => user.email));
+
+        // Step 3: Filter out users whose email already exists
+        const newUsers = users.filter(user => !existingEmailSet.has(user.email));
+
+        if (newUsers.length === 0) {
+            return res.status(409).json({ message: "All users already exist" });
+        }
+
+        // Step 4: Hash passwords and format new users
+        const formattedUsers = await Promise.all(
+            newUsers.map(async (user) => {
+                const hashedPassword = await bcrypt.hash(user.password || "default123", 10);
+                return {
+                    username: user.username || user.email,
+                    fullname: user.fullname,
+                    usn: user.usn,
+                    branch: user.branch,
+                    yop: user.yop,
+                    email: user.email,
+                    password: hashedPassword,
+                    user_type: user.user_type || "user",
+                };
+            })
+        );
+
+        // Step 5: Insert only the filtered new users
+        const insertedUsers = await User.insertMany(formattedUsers);
+
+        res.status(201).json({
+            message: "✅ Users uploaded successfully",
+            insertedCount: insertedUsers.length,
+            skippedCount: users.length - newUsers.length,
+            skippedEmails: [...existingEmailSet],
+            insertedUsers,
+        });
+    } catch (err) {
+        console.error("❌ Bulk upload error:", err);
+        res.status(500).json({ message: "❌ Failed to upload users", error: err.message });
+    }
+};
+

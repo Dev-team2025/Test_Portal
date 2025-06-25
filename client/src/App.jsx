@@ -9,11 +9,12 @@ import Footer from './components/footer/Footer';
 import Charts from './components/charts/Charts';
 import Result from './components/charts/Result';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-
+import EditUserDetails from './components/AdminAccessDetails/EditUserDetails';
 import Analyse from './components/dashboard/Analyse';
 import AdminDashboard from './components/dashboard/AdminDashboard';
 import UsersManagement from './components/AdminAccessDetails/UsersManagement';
-
+import QuestionsManagement from './components/AdminAccessDetails/QuestionsManagement';
+import GenerateReport from './components/AdminAccessDetails/GenerateReport';
 function App() {
   return (
     <Router>
@@ -23,7 +24,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthTabs activeTab="login" />} />
         <Route path="/signup" element={<AuthTabs activeTab="signup" />} />
-
+        <Route path="/admin/settings" element={<QuestionsManagement />} />
         {/* 🔒 Private Routes */}
         <Route
           path="/dashboard"
@@ -41,6 +42,21 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute>
+              <GenerateReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users/edit/:id"
+          element={
+            <ProtectedRoute>
+              <EditUserDetails />
+            </ProtectedRoute>
+          } />
         <Route
           path="/admin/users"
           element={
@@ -91,7 +107,7 @@ function App() {
           }
         />
       </Routes>
-      <Footer />
+
     </Router>
   );
 }

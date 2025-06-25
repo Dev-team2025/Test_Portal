@@ -4,9 +4,10 @@ import quizImage from "../images/quiz.png";
 export default function Dashboard() {
     const navigate = useNavigate();
 
-    const handleCardClick = (quizKey, isActive) => {
+    // 🛠️ Updated: Pass index (1, 2, 3) instead of date string
+    const handleCardClick = (cardIndex, isActive) => {
         if (isActive) {
-            navigate(`/dashboard/quiz?set=${quizKey}`);
+            navigate(`/dashboard/quiz?set=${cardIndex}`);
         }
     };
 
@@ -41,13 +42,13 @@ export default function Dashboard() {
         return new Date() <= sunday10PM;
     };
 
-    const quizzes = quizDays.map(({ day, label }) => {
+    const quizzes = quizDays.map(({ day, label }, index) => {
         const quizDate = new Date(today);
         const startOfWeek = today.getDate() - currentDay + day;
-        quizDate.setDate(startOfWeek); // Always get this week's Monday/Wed/Fri
+        quizDate.setDate(startOfWeek);
 
         return {
-            key: `${currentYear}-${currentMonth + 1}-${quizDate.getDate()}`,
+            key: index + 1, // ✅ 1 for Monday, 2 for Wednesday, 3 for Friday
             label,
             isActive: getQuizStatus(),
             date: quizDate.toDateString()
@@ -57,14 +58,12 @@ export default function Dashboard() {
     return (
         <div className="p-10 max-w-screen-lg mx-auto">
             <div className="mb-8">
-                {/* Month & Year Card */}
                 <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-xl p-4 w-64 shadow-lg mb-4">
                     <h2 className="text-xl font-semibold text-center">
                         {currentMonthName} {currentYear}
                     </h2>
                 </div>
 
-                {/* Current Week Card */}
                 <div className="bg-white/10 backdrop-blur-md border border-white/30 rounded-xl p-2 w-64 shadow-md text-center">
                     <span className="text-md font-medium">📅 Week {currentWeekOfMonth} of the Month</span>
                 </div>
