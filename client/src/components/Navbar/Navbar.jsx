@@ -10,20 +10,22 @@ function Navbar() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [username, setUsername] = useState("");
     const [isAdmin, setIsAdmin] = useState(false);
+    const [fullname, setFullname] = useState(""); // Add fullname state
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        const user = localStorage.getItem("username");
+        const storedUsername = localStorage.getItem("username");
+        const storedFullname = localStorage.getItem("fullname"); // Get fullname from storage
 
         setIsLoggedIn(!!token);
-        setUsername(user || "");
+        setUsername(storedUsername || "");
+        setFullname(storedFullname || ""); // Set fullname from storage
 
         if (token) {
             try {
                 const decoded = jwtDecode(token);
                 setIsAdmin(decoded.userType === "admin");
-                // Store userId for quiz component
-                localStorage.setItem("userId", decoded.userId);
+                localStorage.setItem("userId", decoded.id); // Make sure this is 'id' not 'userId'
 
                 // If admin is on quiz page, redirect to admin dashboard
                 if (decoded.userType === "admin" && location.pathname.includes("/dashboard/quiz")) {
@@ -40,10 +42,12 @@ function Navbar() {
         // Clear all auth-related data
         localStorage.removeItem("token");
         localStorage.removeItem("username");
+        localStorage.removeItem("fullname"); // Clear fullname
         localStorage.removeItem("userId");
 
         setIsLoggedIn(false);
         setUsername("");
+        setFullname(""); // Reset fullname
         setIsAdmin(false);
 
         Swal.fire({
@@ -120,7 +124,7 @@ function Navbar() {
             {isLoggedIn && (
                 <div className="py-2 px-4 border-b">
                     <div className="max-w-7xl mx-auto text-sm">
-                        Logged in as <span className="font-medium">{username}</span>
+                        Logged in as <span className="font-medium">{fullname || username}</span>
                         {isAdmin && (
                             <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
                                 Admin

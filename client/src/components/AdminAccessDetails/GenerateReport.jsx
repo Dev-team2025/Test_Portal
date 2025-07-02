@@ -7,6 +7,7 @@ function GenerateReport() {
     const [filteredData, setFilteredData] = useState([]);
     const [searchBranch, setSearchBranch] = useState("");
     const [searchEmail, setSearchEmail] = useState("");
+    const [selectedQuizSet, setSelectedQuizSet] = useState("all"); // "all", "1", "2", "3"
 
     useEffect(() => {
         axios.get("http://localhost:5000/api/report/user-answers")
@@ -28,11 +29,31 @@ function GenerateReport() {
     const handleReset = () => {
         setSearchBranch("");
         setSearchEmail("");
+        setSelectedQuizSet("all");
         setFilteredData(reportData);
     };
 
+    const filterByQuizSet = (data, quizSet) => {
+        if (quizSet === "all") return data;
+
+        // Assuming each answer has a quizSet property (you'll need to add this to your backend)
+        return data.map(user => ({
+            ...user,
+            answers: user.answers.filter(ans => ans.quizSet === quizSet)
+        })).filter(user => user.answers.length > 0);
+    };
+
     const handleDownload = () => {
-        const excelData = filteredData.map((user) => {
+        const dataToExport = selectedQuizSet === "all"
+            ? filteredData
+            : filterByQuizSet(filteredData, selectedQuizSet);
+
+        if (dataToExport.length === 0) {
+            alert("No data available for the selected quiz set");
+            return;
+        }
+
+        const excelData = dataToExport.map((user) => {
             const base = {
                 Name: user.userDetails.fullname,
                 USN: user.userDetails.usn,
@@ -60,8 +81,12 @@ function GenerateReport() {
 
         const worksheet = XLSX.utils.json_to_sheet(excelData);
         const workbook = XLSX.utils.book_new();
+        const fileName = selectedQuizSet === "all"
+            ? "AllQuizzesReport.xlsx"
+            : `QuizSet${selectedQuizSet}Report.xlsx`;
+
         XLSX.utils.book_append_sheet(workbook, worksheet, "Quiz Report");
-        XLSX.writeFile(workbook, "UserSelectedAnswers.xlsx");
+        XLSX.writeFile(workbook, fileName);
     };
 
     return (
@@ -83,6 +108,16 @@ function GenerateReport() {
                     onChange={e => setSearchEmail(e.target.value)}
                     className="border px-3 py-2 rounded w-64"
                 />
+                <select
+                    value={selectedQuizSet}
+                    onChange={e => setSelectedQuizSet(e.target.value)}
+                    className="border px-3 py-2 rounded w-48"
+                >
+                    <option value="all">All Quiz Sets</option>
+                    <option value="1">Monday Test</option>
+                    <option value="2">Wednesday Test</option>
+                    <option value="3">Friday Test</option>
+                </select>
                 <button
                     onClick={handleSearch}
                     className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -122,6 +157,7 @@ function GenerateReport() {
                     <table className="w-full table-auto border-collapse border border-gray-300 mt-4">
                         <thead>
                             <tr className="bg-gray-100">
+                                <th className="border p-2">Quiz Set</th>
                                 <th className="border p-2">Question</th>
                                 <th className="border p-2">Selected Option</th>
                                 <th className="border p-2">Correct Option</th>
@@ -131,6 +167,7 @@ function GenerateReport() {
                         <tbody>
                             {user.answers.map((ans, idx) => (
                                 <tr key={idx} className={ans.isCorrect ? "bg-green-100" : "bg-red-100"}>
+                                    <td className="border p-2">{ans.quizSet || "N/A"}</td>
                                     <td className="border p-2">{ans.question}</td>
                                     <td className="border p-2">{ans.selectedOption}</td>
                                     <td className="border p-2">{ans.correctOption}</td>
