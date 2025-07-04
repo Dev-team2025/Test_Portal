@@ -39,27 +39,29 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-        return res.status(400).json({ message: "❌ All fields are required" });
+        return res.status(400).json({ success: false, message: "❌ All fields are required" });
     }
 
     try {
         const user = await User.findOne({ email });
-        if (!user) return res.status(401).json({ message: "❌ Invalid credentials" });
+        if (!user) return res.status(401).json({ success: false, message: "❌ Invalid credentials" });
 
         const match = await bcrypt.compare(password, user.password);
-        if (!match) return res.status(401).json({ message: "❌ Invalid credentials" });
+        if (!match) return res.status(401).json({ success: false, message: "❌ Invalid credentials" });
 
         const token = jwt.sign(
             {
                 id: user._id,
                 email: user.email,
-                userType: user.user_type || 'user'
+                userType: user.user_type || 'user' // Make sure this matches what frontend expects
             },
             process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
 
         res.json({
+            success: true,
+            message: "✅ Login successful",
             token,
             userId: user._id,
             username: user.username,
@@ -67,7 +69,7 @@ exports.login = async (req, res) => {
             userType: user.user_type || 'user'
         });
     } catch (err) {
-        res.status(500).json({ message: "❌ Login failed", error: err.message });
+        res.status(500).json({ success: false, message: "❌ Login failed", error: err.message });
     }
 };
 //verify admin
@@ -213,4 +215,3 @@ exports.bulkUploadUsers = async (req, res) => {
         res.status(500).json({ message: "❌ Failed to upload users", error: err.message });
     }
 };
-

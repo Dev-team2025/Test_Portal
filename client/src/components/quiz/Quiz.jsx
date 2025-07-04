@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -193,65 +193,48 @@ function Quiz() {
         if (submitted) return;
 
         try {
-            const answersToSubmit = Object.keys(answers).map(questionId => ({
-                questionId,
-                selectedOption: answers[questionId],
-                isCorrect: questions.find(q => q._id === questionId)?.correctOption === answers[questionId],
-                setNumber: setKey
-            }));
+            // Prepare answers with proper validation
+            const answersToSubmit = questions.map(question => {
+                const userAnswer = answers[question._id];
+                const isCorrect = userAnswer
+                    ? question.correctOption === userAnswer
+                    : false;
+
+                return {
+                    questionId: question._id,
+                    selectedOption: userAnswer || '', // Handle unanswered questions
+                    isCorrect,
+                    setNumber: setKey
+                };
+            }).filter(answer => answer.selectedOption !== ''); // Only submit answered questions
 
             // Submit answers
-            await axios.post("http://localhost:5000/api/answers/store", {
+            const response = await axios.post("http://localhost:5000/api/answers/store", {
                 answers: answersToSubmit,
                 userId
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
-            // Calculate score
-            const calculatedScore = answersToSubmit.filter(a => a.isCorrect).length;
-            setScore(calculatedScore);
-            setSubmitted(true);
+            // Handle response
+            if (response.data && response.data.count > 0) {
+                // Calculate score
+                const calculatedScore = answersToSubmit.filter(a => a.isCorrect).length;
+                setScore(calculatedScore);
+                setSubmitted(true);
 
-            // Show confetti if score is above 70%
-            if (calculatedScore / questions.length >= 0.7) {
-                setShowConfetti(true);
-                setTimeout(() => setShowConfetti(false), 8000);
+                // Rest of your success handling...
+            } else {
+                throw new Error('No answers were stored');
             }
-
-            // Set results for display
-            const resultsObj = {};
-            answersToSubmit.forEach(answer => {
-                resultsObj[answer.questionId] = {
-                    isCorrect: answer.isCorrect,
-                    selectedOption: answer.selectedOption
-                };
-            });
-            setResults(resultsObj);
-
-            // Fetch stats after submission
-            await fetchQuizStats();
-
-            Swal.fire({
-                icon: "success",
-                title: "Quiz Submitted!",
-                html: `
-                    <div class="text-center">
-                        <div class="text-4xl font-bold mb-2">${calculatedScore}/${questions.length}</div>
-                        <div class="text-lg">${Math.round((calculatedScore / questions.length) * 100)}% Accuracy</div>
-                        ${calculatedScore / questions.length >= 0.7 ?
-                        '<div class="mt-4 text-green-600 font-medium">Great job! 🎉</div>' :
-                        '<div class="mt-4 text-blue-600 font-medium">Keep practicing!</div>'}
-                    </div>
-                `,
-                showConfirmButton: false,
-                timer: 3000
-            });
-
         } catch (err) {
             console.error("Error storing answers:", err);
             Swal.fire({
                 icon: "error",
                 title: "Submission Failed",
-                text: "Could not submit your answers. Please try again.",
+                text: err.response?.data?.error || "Could not submit your answers. Please try again.",
             });
         }
     };
@@ -655,7 +638,7 @@ function Quiz() {
 
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                             {/* Question Panel */}
-                            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm">
+                            <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-50 via-white to-gray-100 rounded-xl overflow-hidden">
                                 <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
                                     <CardTitle className="flex items-center justify-between">
                                         <div className="flex items-center space-x-2">
@@ -668,7 +651,11 @@ function Quiz() {
                                             onClick={() => toggleMarkForReview(currentQuestion._id)}
                                             variant={markedForReview[currentQuestion._id] ? "default" : "outline"}
                                             size="sm"
-                                            className={markedForReview[currentQuestion._id] ? "bg-yellow-500 hover:bg-yellow-600" : "bg-white/10 hover:bg-white/20"}
+                                            className={
+                                                markedForReview[currentQuestion._id]
+                                                    ? "bg-yellow-500 hover:bg-yellow-600"
+                                                    : "bg-white/10 hover:bg-white/20"
+                                            }
                                         >
                                             {markedForReview[currentQuestion._id] ? (
                                                 <>
@@ -682,10 +669,12 @@ function Quiz() {
                                         </Button>
                                     </CardTitle>
                                 </CardHeader>
+
                                 <CardContent className="p-8">
                                     <p className="text-xl leading-relaxed text-gray-800 font-medium">
                                         {currentQuestion.question}
                                     </p>
+
                                     {currentQuestion.imageUrl && (
                                         <div className="mt-6 border rounded-lg overflow-hidden">
                                             <img
@@ -697,6 +686,7 @@ function Quiz() {
                                     )}
                                 </CardContent>
                             </Card>
+
 
                             {/* Options Panel */}
                             <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm">
@@ -755,10 +745,11 @@ function Quiz() {
                         </div>
 
                         {/* Navigation */}
-                        <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm">
+                        <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm mt-6">
                             <CardContent className="p-6">
-                                <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row justify-between items-center">
-                                    <div className="flex space-x-2">
+                                <div className="flex flex-col space-y-6">
+                                    {/* Navigation Buttons - First Row */}
+                                    <div className="flex justify-between items-center">
                                         <Button
                                             onClick={() => setCurrentQuestionIndex(prev => Math.max(prev - 1, 0))}
                                             disabled={currentQuestionIndex === 0}
@@ -769,18 +760,28 @@ function Quiz() {
                                             <ChevronLeft className="h-4 w-4 mr-2" /> Previous
                                         </Button>
 
-                                        <Button
-                                            onClick={() => setCurrentQuestionIndex(prev => Math.min(prev + 1, questions.length - 1))}
-                                            disabled={currentQuestionIndex === questions.length - 1}
-                                            variant="outline"
-                                            size="lg"
-                                            className="px-6 disabled:opacity-50"
-                                        >
-                                            Next <ChevronRight className="h-4 w-4 ml-2" />
-                                        </Button>
+                                        {currentQuestionIndex === questions.length - 1 ? (
+                                            <Button
+                                                onClick={handleSubmitTest}
+                                                size="lg"
+                                                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8 py-3 shadow-lg"
+                                            >
+                                                Submit Quiz <Check className="h-4 w-4 ml-2" />
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                onClick={() => setCurrentQuestionIndex(prev => Math.min(prev + 1, questions.length - 1))}
+                                                variant="outline"
+                                                size="lg"
+                                                className="px-6"
+                                            >
+                                                Next <ChevronRight className="h-4 w-4 ml-2" />
+                                            </Button>
+                                        )}
                                     </div>
 
-                                    <div className="flex items-center space-x-2">
+                                    {/* Question Numbers - Simplified without background */}
+                                    <div className="flex flex-wrap justify-center gap-2 mx-auto max-w-2xl">
                                         {questions.map((q, index) => (
                                             <Tooltip key={q._id}>
                                                 <TooltipTrigger asChild>
@@ -790,9 +791,9 @@ function Quiz() {
                                                             ? "bg-blue-600 text-white shadow-lg transform scale-110"
                                                             : answers[q._id]
                                                                 ? markedForReview[q._id]
-                                                                    ? "bg-yellow-100 text-yellow-700 border-2 border-yellow-300"
-                                                                    : "bg-green-100 text-green-700 border-2 border-green-300"
-                                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                                    ? "text-yellow-700 border-2 border-yellow-300"
+                                                                    : "text-green-700 border-2 border-green-300"
+                                                                : "text-gray-600 hover:text-gray-800 border border-gray-300"
                                                             }`}
                                                     >
                                                         {index + 1}
@@ -812,21 +813,14 @@ function Quiz() {
                                         ))}
                                     </div>
 
-                                    <Button
-                                        onClick={handleSubmitTest}
-                                        size="lg"
-                                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8 py-3 shadow-lg"
-                                    >
-                                        Submit Quiz <Check className="h-4 w-4 ml-2" />
-                                    </Button>
-                                </div>
-
-                                <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
-                                    <div>
-                                        <span className="font-medium">{answeredCount}</span> of <span className="font-medium">{questions.length}</span> answered
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">{timeLeft > 0 ? formatTime(timeLeft) : "Time's up!"}</span> remaining
+                                    {/* Status Information */}
+                                    <div className="flex justify-between items-center text-sm text-gray-500">
+                                        <div>
+                                            <span className="font-medium">{answeredCount}</span> of <span className="font-medium">{questions.length}</span> answered
+                                        </div>
+                                        <div>
+                                            <span className="font-medium">{timeLeft > 0 ? formatTime(timeLeft) : "Time's up!"}</span> remaining
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>

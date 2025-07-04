@@ -4,182 +4,171 @@ import * as XLSX from "xlsx";
 
 function GenerateReport() {
     const [reportData, setReportData] = useState([]);
-    const [filteredData, setFilteredData] = useState([]);
-    const [searchBranch, setSearchBranch] = useState("");
+    const [selectedQuizSet, setSelectedQuizSet] = useState("1");
+    const [isLoading, setIsLoading] = useState(false);
+    const [searchCollege, setSearchCollege] = useState("");
     const [searchEmail, setSearchEmail] = useState("");
-    const [selectedQuizSet, setSelectedQuizSet] = useState("all"); // "all", "1", "2", "3"
+
+    const fetchReportData = async (quizSet, college, email) => {
+        setIsLoading(true);
+        try {
+            const res = await axios.get(`http://localhost:5000/api/report/quiz-report`, {
+                params: {
+                    quizSet,
+                    college,
+                    email
+                }
+            });
+            setReportData(res.data);
+        } catch (err) {
+            console.error("Error fetching report:", err);
+            alert("Failed to fetch report data");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        axios.get("http://localhost:5000/api/report/user-answers")
-            .then(res => {
-                setReportData(res.data);
-                setFilteredData(res.data);
-            })
-            .catch(err => console.error("Error fetching report:", err));
-    }, []);
-
-    const handleSearch = () => {
-        const filtered = reportData.filter(user =>
-            user.userDetails.branch.toLowerCase().includes(searchBranch.toLowerCase()) &&
-            user.userDetails.email.toLowerCase().includes(searchEmail.toLowerCase())
-        );
-        setFilteredData(filtered);
-    };
-
-    const handleReset = () => {
-        setSearchBranch("");
-        setSearchEmail("");
-        setSelectedQuizSet("all");
-        setFilteredData(reportData);
-    };
-
-    const filterByQuizSet = (data, quizSet) => {
-        if (quizSet === "all") return data;
-
-        // Assuming each answer has a quizSet property (you'll need to add this to your backend)
-        return data.map(user => ({
-            ...user,
-            answers: user.answers.filter(ans => ans.quizSet === quizSet)
-        })).filter(user => user.answers.length > 0);
-    };
+        fetchReportData(selectedQuizSet, searchCollege, searchEmail);
+    }, [selectedQuizSet, searchCollege, searchEmail]);
 
     const handleDownload = () => {
-        const dataToExport = selectedQuizSet === "all"
-            ? filteredData
-            : filterByQuizSet(filteredData, selectedQuizSet);
-
-        if (dataToExport.length === 0) {
-            alert("No data available for the selected quiz set");
+        if (reportData.length === 0) {
+            alert("No data available for download");
             return;
         }
 
-        const excelData = dataToExport.map((user) => {
-            const base = {
-                Name: user.userDetails.fullname,
-                USN: user.userDetails.usn,
-                Username: user.userDetails.username,
-                Branch: user.userDetails.branch,
-                YOP: user.userDetails.yop,
-                Email: user.userDetails.email,
-                College: user.userDetails.college || "N/A",
-                "Registered On": user.userDetails.created_at
-                    ? new Date(user.userDetails.created_at).toLocaleString()
-                    : "N/A",
+        // Prepare Excel data with simplified question information
+        const excelData = reportData.map(user => {
+            const row = {
+                "User ID": user.userId,
+                "Name": user.fullname,
+                "Email": user.email,
+                "College": user.college || "N/A",
+                "USN": user.usn || "N/A",
+                "Branch": user.branch || "N/A",
+                "Year of Passing": user.yop || "N/A"
             };
 
-            user.answers.forEach((ans) => {
-                const colHeader =
-                    ans.question.length > 100
-                        ? ans.question.substring(0, 100) + "..."
-                        : ans.question;
+            // Add each question response (just the selected option)
+            user.answers.forEach((answer, index) => {
+                const questionNumber = index + 1;
 
-                base[colHeader] = ans.selectedOption || "Not Answered";
+                // User's selected answer (a, b, c, d, or N/A)
+                row[`Q${questionNumber}`] = answer.selectedOption === 'N/A'
+                    ? 'Not Answered'
+                    : answer.selectedOption.toUpperCase();
+
+                // Mark correct answers with *
+                if (answer.isCorrect) {
+                    row[`Q${questionNumber}`] += ' (Correct)';
+                }
             });
 
-            return base;
+            // Add total score
+            const correctAnswers = user.answers.filter(a => a.isCorrect).length;
+            row["Total Score"] = correctAnswers;
+            row["Percentage"] = user.answers.length > 0
+                ? `${((correctAnswers / user.answers.length) * 100).toFixed(2)}%`
+                : "0%";
+
+            return row;
         });
 
+        // Create worksheet
         const worksheet = XLSX.utils.json_to_sheet(excelData);
-        const workbook = XLSX.utils.book_new();
-        const fileName = selectedQuizSet === "all"
-            ? "AllQuizzesReport.xlsx"
-            : `QuizSet${selectedQuizSet}Report.xlsx`;
 
+        // Auto-size columns
+        const wscols = [
+            { wch: 20 }, // User ID
+            { wch: 25 }, // Name
+            { wch: 30 }, // Email
+            { wch: 15 }, // College
+            { wch: 15 }, // USN
+            { wch: 15 }, // Branch
+            { wch: 15 }, // Year of Passing
+            // Question columns will be auto-sized
+            { wch: 15 }, // Total Score
+            { wch: 15 }  // Percentage
+        ];
+        worksheet['!cols'] = wscols;
+
+        const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Quiz Report");
+
+        // Generate file name based on quiz set
+        const quizSetNames = {
+            "1": "MondayTest",
+            "2": "WednesdayTest",
+            "3": "FridayTest"
+        };
+        const fileName = `${quizSetNames[selectedQuizSet]}_Report.xlsx`;
+
+        // Download the file
         XLSX.writeFile(workbook, fileName);
     };
 
     return (
         <div className="p-6">
-            <h2 className="text-2xl font-bold mb-6">User Quiz Report</h2>
+            <h2 className="text-2xl font-bold mb-6">Quiz Report Generator</h2>
 
-            <div className="flex gap-4 mb-6 items-center flex-wrap">
-                <input
-                    type="text"
-                    placeholder="Search by Branch (e.g., CSE)"
-                    value={searchBranch}
-                    onChange={e => setSearchBranch(e.target.value)}
-                    className="border px-3 py-2 rounded w-64"
-                />
-                <input
-                    type="text"
-                    placeholder="Search by Email"
-                    value={searchEmail}
-                    onChange={e => setSearchEmail(e.target.value)}
-                    className="border px-3 py-2 rounded w-64"
-                />
-                <select
-                    value={selectedQuizSet}
-                    onChange={e => setSelectedQuizSet(e.target.value)}
-                    className="border px-3 py-2 rounded w-48"
-                >
-                    <option value="all">All Quiz Sets</option>
-                    <option value="1">Monday Test</option>
-                    <option value="2">Wednesday Test</option>
-                    <option value="3">Friday Test</option>
-                </select>
-                <button
-                    onClick={handleSearch}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                    Search
-                </button>
-                <button
-                    onClick={handleReset}
-                    className="bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
-                >
-                    Reset
-                </button>
-                {filteredData.length > 0 && (
+            <div className="flex flex-col gap-4 mb-6">
+                <div className="flex gap-4 items-center">
+                    <select
+                        value={selectedQuizSet}
+                        onChange={(e) => setSelectedQuizSet(e.target.value)}
+                        className="border px-3 py-2 rounded w-48"
+                    >
+                        <option value="1">Monday Test</option>
+                        <option value="2">Wednesday Test</option>
+                        <option value="3">Friday Test</option>
+                    </select>
+
                     <button
                         onClick={handleDownload}
-                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                        disabled={isLoading || reportData.length === 0}
+                        className={`px-4 py-2 rounded text-white ${isLoading || reportData.length === 0
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-green-600 hover:bg-green-700"
+                            }`}
                     >
-                        Download Excel
+                        {isLoading ? "Generating..." : "Download Excel Report"}
                     </button>
-                )}
+                </div>
+
+                <div className="flex gap-4 items-center">
+                    <input
+                        type="text"
+                        placeholder="Search by college"
+                        value={searchCollege}
+                        onChange={(e) => setSearchCollege(e.target.value)}
+                        className="border px-3 py-2 rounded w-64"
+                        autoComplete="organization"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Search by email"
+                        value={searchEmail}
+                        onChange={(e) => setSearchEmail(e.target.value)}
+                        className="border px-3 py-2 rounded w-64"
+                        autoComplete="email"
+                    />
+                </div>
             </div>
 
-            {filteredData.map((user, index) => (
-                <div key={index} className="mb-8 p-4 border rounded shadow">
-                    <h3 className="text-lg font-semibold mb-2">
-                        {user.userDetails.fullname} ({user.userDetails.username}) <br />
-                        USN: {user.userDetails.usn} <br />
-                        Branch: {user.userDetails.branch}, YOP: {user.userDetails.yop} <br />
-                        Email: {user.userDetails.email} <br />
-                        College: {user.userDetails.college || "N/A"} <br />
-                        Registered On:{" "}
-                        {user.userDetails.created_at
-                            ? new Date(user.userDetails.created_at).toLocaleString()
-                            : "N/A"}
-                    </h3>
+            {isLoading && <p>Loading report data...</p>}
 
-                    <table className="w-full table-auto border-collapse border border-gray-300 mt-4">
-                        <thead>
-                            <tr className="bg-gray-100">
-                                <th className="border p-2">Quiz Set</th>
-                                <th className="border p-2">Question</th>
-                                <th className="border p-2">Selected Option</th>
-                                <th className="border p-2">Correct Option</th>
-                                <th className="border p-2">Result</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {user.answers.map((ans, idx) => (
-                                <tr key={idx} className={ans.isCorrect ? "bg-green-100" : "bg-red-100"}>
-                                    <td className="border p-2">{ans.quizSet || "N/A"}</td>
-                                    <td className="border p-2">{ans.question}</td>
-                                    <td className="border p-2">{ans.selectedOption}</td>
-                                    <td className="border p-2">{ans.correctOption}</td>
-                                    <td className="border p-2 font-bold">
-                                        {ans.isCorrect ? "✅ Correct" : "❌ Incorrect"}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+            {reportData.length > 0 && (
+                <div className="mt-4">
+                    <h3 className="text-lg font-semibold mb-2">Report Summary</h3>
+                    <p>Total Users: {reportData.length}</p>
+                    <p>Total Questions: {reportData[0]?.questions?.length || 0}</p>
+                    <p>Average Score: {
+                        (reportData.reduce((sum, user) => sum + user.answers.filter(a => a.isCorrect).length, 0) /
+                            (reportData.length * (reportData[0]?.questions?.length || 1)) * 100
+                        ).toFixed(2)}%</p>
                 </div>
-            ))}
+            )}
         </div>
     );
 }
