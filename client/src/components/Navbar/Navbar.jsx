@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { jwtDecode } from "jwt-decode";
 import logo from "../../components/images/logo.png";
+import { UserCircle } from "lucide-react";
 
 function Navbar() {
     const location = useLocation();
@@ -10,44 +11,47 @@ function Navbar() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [username, setUsername] = useState("");
     const [isAdmin, setIsAdmin] = useState(false);
-    const [fullname, setFullname] = useState(""); // Add fullname state
+    const [email, setEmail] = useState(""); // New state for email
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        const storedUsername = localStorage.getItem("username");
-        const storedFullname = localStorage.getItem("fullname"); // Get fullname from storage
-
-        setIsLoggedIn(!!token);
-        setUsername(storedUsername || "");
-        setFullname(storedFullname || ""); // Set fullname from storage
 
         if (token) {
             try {
                 const decoded = jwtDecode(token);
-                setIsAdmin(decoded.userType === "admin");
-                localStorage.setItem("userId", decoded.id); // Make sure this is 'id' not 'userId'
+                console.log("Decoded token:", decoded); // For debugging
 
-                // If admin is on quiz page, redirect to admin dashboard
-                if (decoded.userType === "admin" && location.pathname.includes("/dashboard/quiz")) {
+                // Extract user information from token
+                setIsLoggedIn(true);
+                setEmail(decoded.email); // Set email from token
+                setUsername(decoded.email.split('@')[0]); // Extract username from email
+                setIsAdmin(decoded.user_type === "admin");
+
+                // Store user ID if needed
+                localStorage.setItem("userId", decoded._id);
+
+                // Redirect admin if on quiz page
+                if (decoded.user_type === "admin" && location.pathname.includes("/dashboard/quiz")) {
                     navigate("/admin");
                 }
             } catch (err) {
-                console.error("Invalid token");
+                console.error("Invalid token:", err);
                 handleLogout();
             }
+        } else {
+            setIsLoggedIn(false);
+            setUsername("");
+            setEmail("");
+            setIsAdmin(false);
         }
     }, [location, navigate]);
 
     const handleLogout = () => {
-        // Clear all auth-related data
         localStorage.removeItem("token");
-        localStorage.removeItem("username");
-        localStorage.removeItem("fullname"); // Clear fullname
         localStorage.removeItem("userId");
-
         setIsLoggedIn(false);
         setUsername("");
-        setFullname(""); // Reset fullname
+        setEmail("");
         setIsAdmin(false);
 
         Swal.fire({
@@ -61,79 +65,75 @@ function Navbar() {
     };
 
     return (
-        <>
-            <nav className="bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
-                        {/* Logo */}
-                        <div className="flex-shrink-0 flex items-center">
-                            <Link to="/">
-                                <img className="h-10 w-auto" src={logo} alt="Logo" />
-                            </Link>
-                        </div>
-
-                        {/* Navigation links */}
-                        <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-8">
-                            <Link
-                                to="/"
-                                className={`${location.pathname === "/" ? "border-red-800 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
-                            >
-                                Home
-                            </Link>
-
-                            {isAdmin && (
-                                <Link
-                                    to="/admin"
-                                    className={`${location.pathname.startsWith("/admin") ? "border-indigo-500 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
-                                >
-                                    Admin Dashboard
-                                </Link>
-                            )}
-
-                            {isLoggedIn ? (
-                                <>
-                                    {!isAdmin && (
-                                        <Link
-                                            to="/dashboard"
-                                            className={`${location.pathname === "/dashboard" ? "border-indigo-500 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
-                                        >
-                                            Dashboard
-                                        </Link>
-                                    )}
-                                    <button
-                                        onClick={handleLogout}
-                                        className="text-gray-500 hover:text-gray-700 px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-                                    >
-                                        Logout
-                                    </button>
-                                </>
-                            ) : (
-                                <Link
-                                    to="/login"
-                                    className={`${location.pathname === "/login" ? "border-red-800 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
-                                >
-                                    Login
-                                </Link>
-                            )}
-                        </div>
+        <nav className="bg-white shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between h-16">
+                    {/* Logo */}
+                    <div className="flex-shrink-0 flex items-center">
+                        <Link to="/">
+                            <img className="h-10 w-auto" src={logo} alt="Logo" />
+                        </Link>
                     </div>
-                </div>
-            </nav>
 
-            {/* User status bar */}
-            {isLoggedIn && (
-                <div className="py-2 px-4 border-b">
-                    <div className="max-w-7xl mx-auto text-sm">
-                        Logged in as <span className="font-medium">{fullname || username}</span>
+                    {/* Navigation links */}
+                    <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-8">
+                        <Link to="/" className="nav-link" active={location.pathname === "/"}>
+                            Home
+                        </Link>
+
                         {isAdmin && (
-                            <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                                Admin
-                            </span>
+                            <Link to="/admin" className="nav-link" active={location.pathname.startsWith("/admin")}>
+                                Admin Dashboard
+                            </Link>
+                        )}
+
+                        {isLoggedIn ? (
+                            <div className="flex items-center space-x-4">
+                                {!isAdmin && (
+                                    <Link to="/dashboard" className="nav-link" active={location.pathname === "/dashboard"}>
+                                        Dashboard
+                                    </Link>
+                                )}
+
+                                {/* User info with avatar */}
+                                <div className="flex items-center space-x-2">
+                                    <UserCircle className="h-6 w-6 text-gray-500" />
+                                    <div className="text-sm">
+                                        <div className="font-medium text-gray-700">
+                                            {username} {/* Display extracted username */}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {email} {/* Display email */}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button onClick={handleLogout} className="logout-button">
+                                    Logout
+                                </button>
+                            </div>
+                        ) : (
+                            <Link to="/login" className="nav-link" active={location.pathname === "/login"}>
+                                Login
+                            </Link>
                         )}
                     </div>
                 </div>
-            )}
-        </>
+            </div>
+        </nav>
+    );
+}
+
+// Helper components for cleaner code
+function NavLink({ to, active, children, ...props }) {
+    return (
+        <Link
+            to={to}
+            className={`${active ? "border-red-800 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+            {...props}
+        >
+            {children}
+        </Link>
     );
 }
 

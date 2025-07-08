@@ -21,7 +21,10 @@ function UsersManagement() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
-                setUsers(response.data.data);
+                console.log("Fetched users response:", response.data);
+
+                const usersArray = Array.isArray(response.data.users) ? response.data.users : [];
+                setUsers(usersArray);
                 setError(null);
             } catch (err) {
                 console.error("Failed to fetch users:", err);
@@ -72,24 +75,145 @@ function UsersManagement() {
         const file = event.target.files[0];
         if (!file) return;
 
+        // Check file type
+        if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+            await Swal.fire({
+                title: 'Invalid File',
+                text: 'Please upload an Excel file (.xlsx, .xls, .csv)',
+                icon: 'error'
+            });
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: "array" });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const usersFromExcel = XLSX.utils.sheet_to_json(sheet);
-
             try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const firstSheet = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheet];
+                const usersFromExcel = XLSX.utils.sheet_to_json(worksheet);
+
+                // Basic validation
+                if (usersFromExcel.length === 0) {
+                    await Swal.fire({
+                        title: 'Empty File',
+                        text: 'The uploaded file contains no data',
+                        icon: 'warning'
+                    });
+                    return;
+                }
+
+                // Confirm upload with user
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Confirm Upload',
+                    html: `You are about to upload <strong>${usersFromExcel.length}</strong> users.<br><br>
+                    <strong>Please verify:</strong><br>
+                    - All required fields are present<br>
+                    - Email formats are valid<br>
+                    - USN formats are correct (e.g., 1RV20CS001)<br>
+                    - Branch values are valid (MCA, BCA, BSC, ENGINEERING)<br>
+                    - Year of Passing is between 2000-${new Date().getFullYear() + 5}`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Upload',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33'
+                });
+
+                if (!isConfirmed) return;
+
+                setActionLoading(true);
                 const response = await axios.post(
                     "http://localhost:5000/api/auth/users/bulk",
                     { users: usersFromExcel },
-                    { headers: { Authorization: `Bearer ${token}` } }
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
                 );
-                Swal.fire("Success", response.data.message, "success");
-                setUsers(prev => [...prev, ...response.data.insertedUsers]);
+
+                if (response.data.success) {
+                    let successHtml = `
+                    <div style="text-align: left;">
+                        <p>Successfully uploaded <strong>${response.data.insertedCount}</strong> users.</p>
+                `;
+
+                    if (response.data.skippedCount > 0) {
+                        successHtml += `
+                        <p>Skipped <strong>${response.data.skippedCount}</strong> users due to:</p>
+                        <ul>
+                            ${response.data.errors ?
+                                response.data.errors.map(err =>
+                                    `<li>Row ${err.row}: ${err.message}</li>`
+                                ).join('') :
+                                '<li>Existing records in system</li>'
+                            }
+                        </ul>
+                    `;
+                    }
+
+                    successHtml += `</div>`;
+
+                    await Swal.fire({
+                        title: 'Success',
+                        html: successHtml,
+                        icon: 'success'
+                    });
+
+                    // Refresh users list
+                    const refreshResponse = await axios.get(
+                        "http://localhost:5000/api/auth/users",
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    setUsers(refreshResponse.data.users);
+                } else {
+                    let errorHtml = `
+                    <div style="text-align: left; max-height: 300px; overflow-y: auto;">
+                        <p>${response.data.message}</p>
+                `;
+
+                    if (response.data.errors) {
+                        errorHtml += `
+                        <p>Found ${response.data.errors.length} errors:</p>
+                        <ul>
+                            ${response.data.errors.map(err =>
+                            `<li>Row ${err.row}: ${err.message || err.errors.join(', ')}</li>`
+                        ).join('')}
+                        </ul>
+                    `;
+                    }
+
+                    errorHtml += `</div>`;
+
+                    await Swal.fire({
+                        title: 'Upload Failed',
+                        html: errorHtml,
+                        icon: 'error'
+                    });
+                }
             } catch (error) {
-                console.error(error);
-                Swal.fire("Error", error.response?.data?.message || "Failed to upload users", "error");
+                console.error("Upload error:", error);
+                let errorMessage = error.response?.data?.message || 'Failed to process the file';
+
+                if (error.response?.data?.errors) {
+                    errorMessage += '\n\n' +
+                        error.response.data.errors.map(err =>
+                            `Row ${err.row}: ${err.message}`
+                        ).join('\n');
+                }
+
+                await Swal.fire({
+                    title: 'Error',
+                    text: errorMessage,
+                    icon: 'error'
+                });
+            } finally {
+                setActionLoading(false);
+                event.target.value = ''; // Reset file input
             }
         };
         reader.readAsArrayBuffer(file);
@@ -153,14 +277,14 @@ function UsersManagement() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button
+                                        {/* <button
                                             onClick={() => handleEdit(user._id)}
                                             className="text-yellow-600 hover:text-yellow-900 mr-4"
                                             title="Edit"
                                             disabled={actionLoading}
                                         >
                                             <FaEdit />
-                                        </button>
+                                        </button> */}
                                         <button
                                             onClick={() => handleDelete(user._id)}
                                             className="text-red-600 hover:text-red-900"
@@ -168,7 +292,7 @@ function UsersManagement() {
                                             disabled={actionLoading}
                                         >
                                             {actionLoading ? (
-                                                <span className="inline-block h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></span>
+                                                <span className="inline-block h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin "></span>
                                             ) : (
                                                 <FaTrash />
                                             )}

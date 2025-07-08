@@ -8,10 +8,12 @@ const userSchema = new mongoose.Schema({
     yop: { type: Number, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    user_type: { type: String, default: "user" },
-    college: { type: String, required: false }, // ✅ New field added here
+    user_type: { type: String, enum: ['admin', 'student'], default: "student" },
+    collegename: { type: String, required: true },
     created_at: { type: Date, default: Date.now },
     isFirstLogin: { type: Boolean, default: true },
+    last_login: { type: Date },
+    isActive: { type: Boolean, default: true }
 });
 
 module.exports = mongoose.model("User", userSchema);
