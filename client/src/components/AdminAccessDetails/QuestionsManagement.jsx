@@ -49,13 +49,24 @@ function QuestionsManagement() {
         formData.append("file", file);
 
         try {
-            await axios.post("http://localhost:5000/api/questions/upload-excel", formData);
-            Swal.fire("Success", "Questions uploaded from Excel!", "success");
+            const response = await axios.post(
+                "http://localhost:5000/api/questions/upload-excel",
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                }
+            );
+            Swal.fire("Success", response.data.message, "success");
             fetchQuestions();
             setFile(null);
         } catch (err) {
             console.error("Upload Error:", err);
-            Swal.fire("Error", "Failed to upload questions", "error");
+            const errorMsg = err.response?.data?.details ||
+                err.response?.data?.error ||
+                "Failed to upload questions";
+            Swal.fire("Error", errorMsg, "error");
         }
     };
 
@@ -151,7 +162,28 @@ function QuestionsManagement() {
                         required
                     />
                 ))}
+                <select
+                    name="type"
+                    value={formData.type}
+                    onChange={handleChange}
+                    className="p-2 border border-gray-300 rounded"
+                    required
+                >
+                    <option value="technical">Technical</option>
+                    <option value="non-technical">Non-Technical</option>
+                </select>
 
+                <select
+                    name="difficulty"
+                    value={formData.difficulty}
+                    onChange={handleChange}
+                    className="p-2 border border-gray-300 rounded"
+                    required
+                >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
                 <button
                     type="submit"
                     className="col-span-full bg-green-600 text-white py-2 rounded hover:bg-green-700"

@@ -1,5 +1,5 @@
 const Question = require("../models/Questions");
-const getCurrentWeekSets = require("../utils/getCurrentWeekSets");
+const getCurrentWeekSets = require("../utils/WeekUtils").getCurrentWeekSets;
 
 exports.getWeeklyQuestions = async (req, res) => {
     const card = req.query.card;
@@ -30,9 +30,30 @@ exports.getAllQuestions = async (req, res) => {
 };
 
 exports.addQuestion = async (req, res) => {
-    const newQ = new Question(req.body);
-    await newQ.save();
-    res.status(201).json({ message: "Question added" });
+    try {
+        // Transform flat options to nested structure
+        const questionData = {
+            ...req.body,
+            options: {
+                a: req.body.option_a,
+                b: req.body.option_b,
+                c: req.body.option_c,
+                d: req.body.option_d
+            },
+            // Add default values for missing fields
+            type: req.body.type || "technical",
+            difficulty: req.body.difficulty || "medium"
+        };
+
+        const newQ = new Question(questionData);
+        await newQ.save();
+        res.status(201).json({ message: "Question added", data: newQ });
+    } catch (err) {
+        res.status(400).json({
+            error: "Validation failed",
+            details: err.message
+        });
+    }
 };
 
 exports.deleteQuestion = async (req, res) => {

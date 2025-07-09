@@ -32,8 +32,7 @@ function Footer() {
                             <h3 className="text-lg font-semibold mb-3">Contact Us</h3>
                             <p>Email: info@dlithe.com</p>
                             <p>Phone: +91-9008815252</p>
-                            <p>
-                                Location:  No. 280. 3rd Floor SLV ARCADE. 100 Feet Ring Road, BSK 3rd Stage, Bangalore-560070</p>
+                            <p>Location: No. 280. 3rd Floor SLV ARCADE. 100 Feet Ring Road, BSK 3rd Stage, Bangalore-560070</p>
                         </div>
 
                         {/* Social Icons */}
@@ -51,15 +50,7 @@ function Footer() {
 
                 {/* Map Embed */}
                 <div className="mt-10 rounded-lg overflow-hidden shadow-lg border border-gray-700">
-                    <iframe
-                        title="Dlithe Consultancy Services Location"
-                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3890.3695118169467!2d77.62763437486063!3d12.91416298739048!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae15f6b9dc69d5%3A0x40bcb89a89831443!2sDlithe%20Consultancy%20Services!5e0!3m2!1sen!2sin!4v1686645370001!5m2!1sen!2sin"
-                        width="100%"
-                        height="300"
-                        allowFullScreen=""
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                    ></iframe>
+                    <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3888.7294940371207!2d77.54736780860529!3d12.92509971584759!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae3fdfd6391453%3A0x4662827b839e02e8!2sDLithe%20Consultancy%20Services%20Pvt%20Ltd!5e0!3m2!1sen!2sus!4v1752063482209!5m2!1sen!2sus" width="100%" height="450" style={{ "border:0;": "border:0" }} allowFullScreen="" loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe>
                 </div>
 
                 {/* Bottom Line */}

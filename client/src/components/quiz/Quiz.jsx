@@ -1,22 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
-import axios from "axios";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import Swal from "sweetalert2";
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
     CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Check,
     Trophy, Target, AlertTriangle, Loader2, Bookmark, Flag,
     BarChart2, Award, Home, RotateCw, Info
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import AlertMessage from '../AlertMessage/AlertMessage';
-import Confetti from 'react-confetti';
+} from 'lucide-react';
 
-function Quiz() {
+// Create axios instance with base configuration
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+    withCredentials: true,
+    timeout: 10000,
+});
+
+const Quiz = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const setKey = searchParams.get("set");
@@ -26,74 +24,61 @@ function Quiz() {
     const [markedForReview, setMarkedForReview] = useState({});
     const [submitted, setSubmitted] = useState(false);
     const [score, setScore] = useState(0);
-    const [results, setResults] = useState({});
     const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showConfetti, setShowConfetti] = useState(false);
-    const [windowSize, setWindowSize] = useState({
-        width: window.innerWidth,
-        height: window.innerHeight
-    });
-    const [stats, setStats] = useState(null);
-    const [activeTab, setActiveTab] = useState("quiz");
-
-    const userId = localStorage.getItem("userId");
-
-    // Format time as MM:SS
-    const formatTime = useCallback((seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }, []);
-
-    // Get time color based on remaining time
-    const getTimeColor = useCallback(() => {
-        if (timeLeft > 600) return "text-green-600 bg-green-50 border-green-200";
-        if (timeLeft > 300) return "text-yellow-600 bg-yellow-50 border-yellow-200";
-        return "text-red-600 bg-red-50 border-red-200 animate-pulse";
-    }, [timeLeft]);
-
-    // Calculate progress percentage
-    const progressPercentage = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
-
-    // Calculate answered questions count
-    const answeredCount = Object.keys(answers).length;
-
-    // Calculate marked for review count
-    const markedCount = Object.keys(markedForReview).filter(id => markedForReview[id]).length;
+    const [submitting, setSubmitting] = useState(false);
 
     // Fetch questions
     useEffect(() => {
         const fetchQuestions = async () => {
             try {
                 setLoading(true);
-                const res = await axios.get(
-                    `http://localhost:5000/api/questions/weekly-questions?card=${setKey}`
-                );
+                setError(null);
+
+                // Validate setKey first
+                if (!setKey || !['1', '2', '3'].includes(setKey)) {
+                    throw new Error("Invalid quiz set selected");
+                }
+
+                const res = await api.get(`/questions/weekly-questions?card=${setKey}`);
+
+                if (!res.data || !Array.isArray(res.data)) {
+                    throw new Error("Invalid response format from server");
+                }
+
+                if (res.data.length === 0) {
+                    throw new Error("No questions available for this set");
+                }
+
                 setQuestions(res.data);
 
-                // Initialize markedForReview state
+                // Initialize states
                 const initialMarked = {};
+                const initialAnswers = {};
                 res.data.forEach(q => {
                     initialMarked[q._id] = false;
+                    initialAnswers[q._id] = null;
                 });
                 setMarkedForReview(initialMarked);
+                setAnswers(initialAnswers);
 
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching questions:", err);
-                setError("Failed to load questions. Please try again later.");
+                setError(err.response?.data?.message || err.message || "Failed to load questions");
                 setLoading(false);
+                setQuestions([]);
             }
         };
 
-        if (setKey) fetchQuestions();
+        fetchQuestions();
     }, [setKey]);
 
     // Timer effect
     useEffect(() => {
-        if (submitted || loading) return;
+        if (submitted || loading || questions.length === 0) return;
 
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
@@ -107,729 +92,412 @@ function Quiz() {
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [submitted, loading]);
-
-    // Prevent cheating
-    useEffect(() => {
-        const preventCheating = (e) => {
-            e.preventDefault();
-            Swal.fire({
-                icon: "warning",
-                title: "Restricted Action",
-                text: "This action is not allowed during the quiz.",
-                timer: 3000,
-                showConfirmButton: false,
-            });
-        };
-
-        const handleTabSwitch = () => {
-            if (!submitted) {
-                Swal.fire({
-                    icon: "warning",
-                    title: "Tab Switch Detected",
-                    text: "Your quiz has been auto-submitted due to leaving the page.",
-                    timer: 3000,
-                    showConfirmButton: false,
-                });
-                handleSubmitTest();
-            }
-        };
-
-        // Add event listeners
-        const events = ['copy', 'cut', 'paste', 'contextmenu'];
-        events.forEach(event => {
-            document.addEventListener(event, preventCheating);
-        });
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "hidden") handleTabSwitch();
-        });
-
-        return () => {
-            // Cleanup event listeners
-            events.forEach(event => {
-                document.removeEventListener(event, preventCheating);
-            });
-            document.removeEventListener("visibilitychange", handleTabSwitch);
-        };
-    }, [submitted]);
-
-    // Handle window resize for confetti
-    useEffect(() => {
-        const handleResize = () => {
-            setWindowSize({
-                width: window.innerWidth,
-                height: window.innerHeight
-            });
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [submitted, loading, questions.length]);
 
     const handleAnswerSelect = (questionId, selectedOption) => {
-        setAnswers((prev) => ({
+        if (submitted) return;
+
+        setAnswers(prev => ({
             ...prev,
             [questionId]: selectedOption
         }));
     };
 
     const toggleMarkForReview = (questionId) => {
+        if (submitted) return;
+
         setMarkedForReview(prev => ({
             ...prev,
             [questionId]: !prev[questionId]
         }));
     };
 
-    const fetchQuizStats = async () => {
-        try {
-            const res = await axios.get(`http://localhost:5000/api/answers/stats?set=${setKey}`);
-            setStats(res.data);
-        } catch (err) {
-            console.error("Error fetching quiz stats:", err);
-        }
-    };
-
     const handleSubmitTest = async () => {
-        if (submitted) return;
+        if (submitted || submitting) return;
 
         try {
-            // Prepare answers with proper validation
-            const answersToSubmit = questions.map(question => {
-                const userAnswer = answers[question._id];
-                const isCorrect = userAnswer
-                    ? question.correctOption === userAnswer
-                    : false;
+            setSubmitting(true);
 
-                return {
-                    questionId: question._id,
-                    selectedOption: userAnswer || '', // Handle unanswered questions
-                    isCorrect,
-                    setNumber: setKey
-                };
-            }).filter(answer => answer.selectedOption !== ''); // Only submit answered questions
-
-            // Submit answers
-            const response = await axios.post("http://localhost:5000/api/answers/store", {
-                answers: answersToSubmit,
-                userId
-            }, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            const response = await api.post("/answers/store", {
+                answers,
+                questionIds: questions.map(q => q._id),
+                set: setKey
             });
 
-            // Handle response
-            if (response.data && response.data.count > 0) {
-                // Calculate score
-                const calculatedScore = answersToSubmit.filter(a => a.isCorrect).length;
-                setScore(calculatedScore);
-                setSubmitted(true);
+            if (!response.data) {
+                throw new Error("No response data received");
+            }
 
-                // Rest of your success handling...
-            } else {
-                throw new Error('No answers were stored');
+            setScore(response.data.score || 0);
+            setSubmitted(true);
+            setSubmitting(false);
+
+            if ((response.data.score || 0) >= questions.length * 0.7) {
+                setShowConfetti(true);
+                setTimeout(() => setShowConfetti(false), 5000);
             }
         } catch (err) {
-            console.error("Error storing answers:", err);
-            Swal.fire({
-                icon: "error",
-                title: "Submission Failed",
-                text: err.response?.data?.error || "Could not submit your answers. Please try again.",
-            });
+            console.error("Error submitting answers:", err);
+            setError(err.response?.data?.message || err.message || "Failed to submit answers");
+            setSubmitting(false);
         }
     };
 
-    const currentQuestion = questions[currentQuestionIndex];
+    // Format time as MM:SS
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Get time color based on remaining time
+    const getTimeColor = () => {
+        if (timeLeft > 600) return "text-green-600 bg-green-50 border-green-200";
+        if (timeLeft > 300) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+        return "text-red-600 bg-red-50 border-red-200";
+    };
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex justify-center items-center">
-                <Card className="p-8 shadow-xl border-0 bg-white/70 backdrop-blur-sm">
-                    <div className="text-center">
-                        <div className="relative">
-                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-6"></div>
-                            <div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-purple-200 border-b-purple-600 mx-auto animate-spin" style={{ animationDirection: 'reverse', animationDuration: '3s' }}></div>
-                        </div>
-                        <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Quiz</h2>
-                        <p className="text-gray-600">Preparing your questions...</p>
-                    </div>
-                </Card>
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <Loader2 className="h-12 w-12 animate-spin text-blue-500 mx-auto" />
+                    <p className="mt-4 text-lg">Loading quiz questions...</p>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex justify-center items-center">
-                <Card className="p-8 shadow-xl max-w-md border-0 bg-white/80 backdrop-blur-sm">
-                    <div className="text-center">
-                        <div className="bg-red-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                            <XCircle className="h-8 w-8 text-red-600" />
-                        </div>
-                        <h2 className="text-xl font-bold mb-2 text-gray-800">Unable to Load Quiz</h2>
-                        <p className="mb-6 text-gray-600">{error}</p>
-                        <div className="flex justify-center space-x-4">
-                            <Button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-700">
-                                <RotateCw className="h-4 w-4 mr-2" /> Try Again
-                            </Button>
-                            <Button onClick={() => navigate("/dashboard")} variant="outline">
-                                <Home className="h-4 w-4 mr-2" /> Dashboard
-                            </Button>
-                        </div>
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center max-w-md p-6 bg-red-50 rounded-lg">
+                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto" />
+                    <h2 className="text-xl font-bold mt-4 text-red-600">Error Loading Quiz</h2>
+                    <p className="mt-2 text-gray-600">{error}</p>
+                    <div className="mt-4 flex gap-3 justify-center">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                            Try Again
+                        </button>
+                        <button
+                            onClick={() => navigate("/")}
+                            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                        >
+                            Back to Home
+                        </button>
                     </div>
-                </Card>
+                </div>
             </div>
         );
     }
 
-    if (questions.length === 0) {
+    if (questions.length === 0 && !loading && !error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex justify-center items-center">
-                <Card className="p-8 shadow-xl max-w-md border-0 bg-white/80 backdrop-blur-sm">
-                    <div className="text-center">
-                        <div className="bg-yellow-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                            <AlertTriangle className="h-8 w-8 text-yellow-600" />
-                        </div>
-                        <h2 className="text-xl font-bold mb-2 text-gray-800">No Questions Available</h2>
-                        <p className="mb-6 text-gray-600">There are no questions for this quiz set.</p>
-                        <Button onClick={() => navigate("/dashboard")} className="bg-yellow-600 hover:bg-yellow-700">
-                            <Home className="h-4 w-4 mr-2" /> Back to Dashboard
-                        </Button>
-                    </div>
-                </Card>
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center max-w-md p-6 bg-yellow-50 rounded-lg">
+                    <Info className="h-12 w-12 text-yellow-500 mx-auto" />
+                    <h2 className="text-xl font-bold mt-4">No Questions Available</h2>
+                    <p className="mt-2 text-gray-600">There are no questions for this quiz set.</p>
+                    <button
+                        onClick={() => navigate("/")}
+                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                        Back to Home
+                    </button>
+                </div>
             </div>
         );
     }
+
+    const currentQuestion = questions[currentQuestionIndex];
+    const progressPercentage = (currentQuestionIndex + 1) / questions.length * 100;
+    const answeredCount = Object.values(answers).filter(a => a !== null).length;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="min-h-screen bg-gray-50 p-4">
             {showConfetti && (
-                <Confetti
-                    width={windowSize.width}
-                    height={windowSize.height}
-                    recycle={false}
-                    numberOfPieces={500}
-                    gravity={0.2}
-                />
+                <div className="fixed inset-0 z-50 pointer-events-none">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-4xl font-bold text-white bg-blue-500/90 px-8 py-4 rounded-full shadow-lg">
+                            Great Job! 🎉
+                        </div>
+                    </div>
+                </div>
             )}
 
-            <AlertMessage />
-
-            <div className="container mx-auto px-4 py-6 max-w-7xl">
-                {submitted ? (
-                    <Tabs defaultValue="results" className="space-y-6">
-                        <TabsList className="grid w-full grid-cols-2 max-w-xs mx-auto">
-                            <TabsTrigger value="results" onClick={() => setActiveTab("results")}>
-                                <BarChart2 className="h-4 w-4 mr-2" /> Results
-                            </TabsTrigger>
-                            <TabsTrigger value="stats" onClick={() => setActiveTab("stats")}>
-                                <Award className="h-4 w-4 mr-2" /> Statistics
-                            </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="results" className="space-y-8 animate-fade-in">
-                            {/* Results Header */}
-                            <Card className="border-0 shadow-2xl bg-gradient-to-r from-white to-blue-50/30 backdrop-blur-sm">
-                                <CardContent className="p-8">
-                                    <div className="text-center">
-                                        <div className="relative mb-6">
-                                            {score >= (questions.length / 2) ? (
-                                                <div className="inline-flex items-center justify-center p-6 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 shadow-lg">
-                                                    <Trophy className="h-16 w-16 text-white" />
-                                                </div>
-                                            ) : (
-                                                <div className="inline-flex items-center justify-center p-6 rounded-full bg-gradient-to-r from-orange-400 to-red-500 shadow-lg">
-                                                    <Target className="h-16 w-16 text-white" />
-                                                </div>
-                                            )}
-                                            <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400 to-pink-400 rounded-full opacity-20 blur-lg"></div>
-                                        </div>
-
-                                        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                                            Quiz Completed!
-                                        </h1>
-
-                                        <div className="flex justify-center items-center space-x-8 mb-6">
-                                            <div className="text-center">
-                                                <div className="text-3xl font-bold text-blue-600">{score}</div>
-                                                <div className="text-sm text-gray-600">Correct</div>
-                                            </div>
-                                            <div className="text-4xl text-gray-300">/</div>
-                                            <div className="text-center">
-                                                <div className="text-3xl font-bold text-gray-600">{questions.length}</div>
-                                                <div className="text-sm text-gray-600">Total</div>
-                                            </div>
-                                        </div>
-
-                                        <Badge variant="outline" className="text-lg px-4 py-2 bg-blue-50 border-blue-200">
-                                            Set {setKey} - {['Monday', 'Wednesday', 'Friday'][Number(setKey) - 1]} Quiz
-                                        </Badge>
-
-                                        <div className="mt-6">
-                                            <Progress value={questions.length > 0 ? (score / questions.length) * 100 : 0} className="h-3" />
-                                            <p className="text-sm text-gray-600 mt-2">
-                                                {questions.length > 0 ? Math.round((score / questions.length) * 100) : 0}% accuracy
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Detailed Results */}
-                            <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm">
-                                <CardHeader>
-                                    <CardTitle className="text-2xl font-bold text-gray-800">Detailed Results</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
-                                                <tr>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Question</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Your Answer</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correct Answer</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-100">
-                                                {questions.map((q, index) => {
-                                                    const result = results[q._id] || {};
-                                                    const userAnswer = answers[q._id];
-                                                    const correctAnswer = q.correctOption.toUpperCase();
-                                                    const isCorrect = result.isCorrect;
-
-                                                    return (
-                                                        <tr key={q._id} className={`transition-colors hover:bg-gray-50 ${isCorrect ? "bg-green-50/50" : "bg-red-50/50"}`}>
-                                                            <td className="px-6 py-4 text-sm text-gray-900">
-                                                                <div className="flex items-start space-x-3">
-                                                                    <Badge variant="outline" className="mt-0.5 flex-shrink-0">
-                                                                        {index + 1}
-                                                                    </Badge>
-                                                                    <div className="font-medium">{q.question}</div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-sm">
-                                                                {userAnswer ? (
-                                                                    <div className="flex items-center space-x-2">
-                                                                        <Badge variant={isCorrect ? "default" : "destructive"} className="font-bold">
-                                                                            {userAnswer}
-                                                                        </Badge>
-                                                                        <span className="text-gray-600">{q.options[userAnswer.toLowerCase()]}</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <Badge variant="outline" className="text-gray-500">
-                                                                        Not answered
-                                                                    </Badge>
-                                                                )}
-                                                            </td>
-                                                            <td className="px-6 py-4 text-sm">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <Badge variant="default" className="bg-green-600 font-bold">
-                                                                        {correctAnswer}
-                                                                    </Badge>
-                                                                    <span className="text-gray-600">{q.options[correctAnswer.toLowerCase()]}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-sm">
-                                                                <Badge variant={isCorrect ? "default" : "destructive"} className="flex items-center w-fit">
-                                                                    {isCorrect ? (
-                                                                        <>
-                                                                            <Check className="h-3 w-3 mr-1" /> Correct
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <XCircle className="h-3 w-3 mr-1" /> Incorrect
-                                                                        </>
-                                                                    )}
-                                                                </Badge>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <div className="flex justify-center space-x-4">
-                                <Button
-                                    onClick={() => navigate("/dashboard")}
-                                    size="lg"
-                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-3 shadow-lg"
-                                >
-                                    <Home className="h-4 w-4 mr-2" /> Back to Dashboard
-                                </Button>
-                                <Button
-                                    onClick={() => window.location.reload()}
-                                    variant="outline"
-                                    size="lg"
-                                    className="px-8 py-3"
-                                >
-                                    <RotateCw className="h-4 w-4 mr-2" /> Retake Quiz
-                                </Button>
+            <div className="max-w-6xl mx-auto">
+                {/* Quiz Header */}
+                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="w-full md:w-auto">
+                            <div className="text-sm font-medium text-blue-600 mb-2">
+                                Set {setKey} - Question {currentQuestionIndex + 1} of {questions.length}
                             </div>
-                        </TabsContent>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${progressPercentage}%` }}
+                                ></div>
+                            </div>
+                        </div>
 
-                        <TabsContent value="stats" className="space-y-8 animate-fade-in">
-                            {stats ? (
-                                <>
-                                    <Card className="border-0 shadow-2xl bg-gradient-to-r from-white to-blue-50/30 backdrop-blur-sm">
-                                        <CardHeader>
-                                            <CardTitle className="text-2xl font-bold text-gray-800">Quiz Statistics</CardTitle>
-                                            <CardDescription>How you compare with other learners</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h3 className="font-medium text-gray-600">Your Score</h3>
-                                                    <Badge variant="outline" className="bg-blue-50 text-blue-600">
-                                                        {Math.round((score / questions.length) * 100)}%
-                                                    </Badge>
-                                                </div>
-                                                <Progress value={(score / questions.length) * 100} className="h-2" />
-                                                <div className="mt-2 text-sm text-gray-500">
-                                                    {score} out of {questions.length} correct
-                                                </div>
-                                            </div>
+                        <div className="flex flex-wrap items-center gap-2 justify-center md:justify-end">
+                            <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="font-medium">{answeredCount}</span>
+                                <span className="text-sm text-gray-500">Answered</span>
+                            </div>
 
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h3 className="font-medium text-gray-600">Average Score</h3>
-                                                    <Badge variant="outline" className="bg-purple-50 text-purple-600">
-                                                        {Math.round(stats.averageScore)}%
-                                                    </Badge>
-                                                </div>
-                                                <Progress value={stats.averageScore} className="h-2" />
-                                                <div className="mt-2 text-sm text-gray-500">
-                                                    Based on {stats.totalAttempts} attempts
-                                                </div>
-                                            </div>
+                            <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg">
+                                <Bookmark className="h-5 w-5 text-yellow-600" />
+                                <span className="font-medium">
+                                    {Object.values(markedForReview).filter(Boolean).length}
+                                </span>
+                                <span className="text-sm text-gray-500">Marked</span>
+                            </div>
 
-                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h3 className="font-medium text-gray-600">Your Rank</h3>
-                                                    <Badge variant="outline" className="bg-green-50 text-green-600">
-                                                        Top {stats.percentile}%
-                                                    </Badge>
-                                                </div>
-                                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-gradient-to-r from-green-400 to-emerald-500"
-                                                        style={{ width: `${100 - stats.percentile}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className="mt-2 text-sm text-gray-500">
-                                                    Better than {stats.percentile}% of participants
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${getTimeColor()}`}>
+                                <Clock className="h-5 w-5" />
+                                <span className="font-bold">{formatTime(timeLeft)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                                    <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm">
-                                        <CardHeader>
-                                            <CardTitle className="text-2xl font-bold text-gray-800">Question Analysis</CardTitle>
-                                            <CardDescription>Review the most challenging questions</CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-6">
-                                                {questions
-                                                    .filter(q => stats.questionStats[q._id]?.correctPercentage < 50)
-                                                    .sort((a, b) => stats.questionStats[a._id].correctPercentage - stats.questionStats[b._id].correctPercentage)
-                                                    .slice(0, 3)
-                                                    .map((q, i) => (
-                                                        <div key={q._id} className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                                                            <div className="flex justify-between items-start mb-3">
-                                                                <div className="flex items-center space-x-3">
-                                                                    <Badge variant="destructive" className="font-bold">
-                                                                        {i + 1}
-                                                                    </Badge>
-                                                                    <h4 className="font-medium text-gray-800">{q.question}</h4>
-                                                                </div>
-                                                                <Badge variant="outline" className="bg-red-50 text-red-600">
-                                                                    Only {Math.round(stats.questionStats[q._id].correctPercentage)}% correct
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="ml-12">
-                                                                <div className="text-sm text-gray-600 mb-2">
-                                                                    <span className="font-medium">Correct Answer:</span> {q.options[q.correctOption.toLowerCase()]}
-                                                                </div>
-                                                                <div className="text-sm text-gray-500">
-                                                                    <span className="font-medium">Explanation:</span> {q.explanation || "No explanation provided."}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                }
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </>
-                            ) : (
-                                <div className="flex justify-center items-center py-12">
-                                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                                </div>
-                            )}
-                        </TabsContent>
-                    </Tabs>
+                {submitted ? (
+                    <div className="bg-white rounded-xl shadow-md p-8 text-center">
+                        <div className="mb-6">
+                            <Trophy className="h-16 w-16 text-yellow-500 mx-auto" />
+                            <h2 className="text-2xl font-bold mt-4">Quiz Completed!</h2>
+                            <p className="text-gray-600 mt-2">
+                                You scored {score} out of {questions.length}
+                            </p>
+                            <div className="w-full bg-gray-200 rounded-full h-4 mt-6">
+                                <div
+                                    className="bg-blue-600 h-4 rounded-full"
+                                    style={{ width: `${(score / questions.length) * 100}%` }}
+                                ></div>
+                            </div>
+                            <p className="mt-2 text-sm text-gray-500">
+                                {score >= questions.length * 0.7 ? "Great job!" : "Keep practicing!"}
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-4">
+                            <button
+                                onClick={() => navigate("/dashboard")}
+                                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+                            >
+                                <Home className="h-5 w-5" />
+                                Back to Dashboard
+                            </button>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2"
+                            >
+                                <RotateCw className="h-5 w-5" />
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
                 ) : (
-                    <div className="space-y-6 animate-fade-in">
-                        {/* Quiz Header */}
-                        <Card className="border-0 shadow-xl bg-gradient-to-r from-white to-blue-50/30 backdrop-blur-sm">
-                            <CardContent className="p-6">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-                                    <div>
-                                        <Badge variant="outline" className="mb-2 bg-blue-50 border-blue-200 text-blue-700">
-                                            Set {setKey} - {['Monday', 'Wednesday', 'Friday'][Number(setKey) - 1]} Quiz
-                                        </Badge>
-                                        <div className="flex items-center space-x-4">
-                                            <div className="text-sm text-gray-600">
-                                                Question <span className="font-bold text-blue-600">{currentQuestionIndex + 1}</span> of <span className="font-bold">{questions.length}</span>
-                                            </div>
-                                            <Progress value={progressPercentage} className="w-32 h-2" />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center space-x-4">
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Card className="bg-green-50 border-green-200 text-green-700">
-                                                    <CardContent className="p-3">
-                                                        <div className="flex items-center space-x-2">
-                                                            <CheckCircle className="h-4 w-4" />
-                                                            <span className="font-medium">{answeredCount}</span>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Answered questions</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Card className="bg-yellow-50 border-yellow-200 text-yellow-700">
-                                                    <CardContent className="p-3">
-                                                        <div className="flex items-center space-x-2">
-                                                            <Bookmark className="h-4 w-4" />
-                                                            <span className="font-medium">{markedCount}</span>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Marked for review</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-
-                                        <Card className={`${getTimeColor()} border-2 shadow-lg`}>
-                                            <CardContent className="p-3">
-                                                <div className="flex items-center space-x-2">
-                                                    <Clock className="h-4 w-4" />
-                                                    <span className="font-bold">{formatTime(timeLeft)}</span>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* Question Panel */}
-                            <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-50 via-white to-gray-100 rounded-xl overflow-hidden">
-                                <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
-                                    <CardTitle className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-                                                Q{currentQuestionIndex + 1}
-                                            </Badge>
-                                            <span>Question</span>
-                                        </div>
-                                        <Button
-                                            onClick={() => toggleMarkForReview(currentQuestion._id)}
-                                            variant={markedForReview[currentQuestion._id] ? "default" : "outline"}
-                                            size="sm"
-                                            className={
-                                                markedForReview[currentQuestion._id]
-                                                    ? "bg-yellow-500 hover:bg-yellow-600"
-                                                    : "bg-white/10 hover:bg-white/20"
-                                            }
-                                        >
-                                            {markedForReview[currentQuestion._id] ? (
-                                                <>
-                                                    <Bookmark className="h-4 w-4 mr-2 fill-current" /> Marked
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Bookmark className="h-4 w-4 mr-2" /> Mark for Review
-                                                </>
-                                            )}
-                                        </Button>
-                                    </CardTitle>
-                                </CardHeader>
+                            <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                                <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold">Q{currentQuestionIndex + 1}</span>
+                                        <span>Question</span>
+                                    </div>
+                                    <button
+                                        onClick={() => toggleMarkForReview(currentQuestion._id)}
+                                        className={`flex items-center gap-2 px-3 py-1 rounded-md ${markedForReview[currentQuestion._id]
+                                            ? 'bg-yellow-500 hover:bg-yellow-600'
+                                            : 'bg-white/10 hover:bg-white/20'
+                                            }`}
+                                        disabled={submitted}
+                                    >
+                                        <Bookmark className="h-4 w-4" />
+                                        {markedForReview[currentQuestion._id] ? 'Marked' : 'Mark'}
+                                    </button>
+                                </div>
 
-                                <CardContent className="p-8">
-                                    <p className="text-xl leading-relaxed text-gray-800 font-medium">
+                                <div className="p-6">
+                                    <p className="text-lg font-medium text-gray-800 mb-6">
                                         {currentQuestion.question}
                                     </p>
 
                                     {currentQuestion.imageUrl && (
-                                        <div className="mt-6 border rounded-lg overflow-hidden">
+                                        <div className="mb-6 border rounded-lg overflow-hidden">
                                             <img
                                                 src={currentQuestion.imageUrl}
                                                 alt="Question illustration"
-                                                className="w-full h-auto max-h-64 object-contain"
+                                                className="w-full h-auto max-h-64 object-contain mx-auto"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                }}
                                             />
                                         </div>
                                     )}
-                                </CardContent>
-                            </Card>
-
+                                </div>
+                            </div>
 
                             {/* Options Panel */}
-                            <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm">
-                                <CardHeader>
-                                    <CardTitle className="text-gray-800 flex items-center space-x-2">
-                                        <Target className="h-5 w-5 text-blue-600" />
-                                        <span>Select your answer</span>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-6">
-                                    <div className="space-y-4">
-                                        {['a', 'b', 'c', 'd'].map((opt, index) => {
-                                            const isSelected = answers[currentQuestion._id] === opt.toUpperCase();
-                                            return (
-                                                <button
-                                                    key={opt}
-                                                    onClick={() => handleAnswerSelect(currentQuestion._id, opt.toUpperCase())}
-                                                    className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg ${isSelected
-                                                        ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-400 shadow-md ring-2 ring-blue-200"
-                                                        : "border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50"
-                                                        }`}
-                                                >
-                                                    <div className="flex items-center space-x-4">
-                                                        <div className={`flex-shrink-0 h-8 w-8 rounded-full border-2 flex items-center justify-center font-bold text-sm transition-all ${isSelected
-                                                            ? "bg-blue-500 border-blue-500 text-white shadow-md"
-                                                            : "bg-white border-gray-300 text-gray-500"
-                                                            }`}>
-                                                            {isSelected ? (
-                                                                <Check className="h-4 w-4" />
-                                                            ) : (
-                                                                opt.toUpperCase()
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <span className="text-lg text-gray-800">{currentQuestion.options[opt]}</span>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                            <div className="bg-white rounded-xl shadow-md p-6">
+                                <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                                    <Target className="h-5 w-5 text-blue-600" />
+                                    Select your answer
+                                </h2>
 
-                                    {currentQuestion.explanation && answers[currentQuestion._id] && (
-                                        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                            <div className="flex items-center space-x-2 text-blue-700 mb-2">
-                                                <Info className="h-4 w-4" />
-                                                <span className="font-medium">Explanation</span>
-                                            </div>
-                                            <p className="text-sm text-gray-700">
-                                                {currentQuestion.explanation}
-                                            </p>
+                                <div className="space-y-4">
+                                    {['a', 'b', 'c', 'd'].map(opt => {
+                                        const isSelected = answers[currentQuestion._id] === opt.toUpperCase();
+                                        const isCorrect = submitted && currentQuestion.correctOption === opt.toUpperCase();
+                                        const isIncorrect = submitted && isSelected && !isCorrect;
+
+                                        return (
+                                            <button
+                                                key={opt}
+                                                onClick={() => handleAnswerSelect(currentQuestion._id, opt.toUpperCase())}
+                                                className={`w-full text-left p-4 rounded-lg border-2 transition-all ${isSelected
+                                                    ? submitted
+                                                        ? isCorrect
+                                                            ? 'border-green-500 bg-green-50'
+                                                            : 'border-red-500 bg-red-50'
+                                                        : 'border-blue-500 bg-blue-50'
+                                                    : submitted && isCorrect
+                                                        ? 'border-green-500 bg-green-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                    }`}
+                                                disabled={submitted}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div
+                                                        className={`flex-shrink-0 h-8 w-8 rounded-full border-2 flex items-center justify-center font-bold ${isSelected
+                                                            ? submitted
+                                                                ? isCorrect
+                                                                    ? 'bg-green-500 border-green-500 text-white'
+                                                                    : 'bg-red-500 border-red-500 text-white'
+                                                                : 'bg-blue-500 border-blue-500 text-white'
+                                                            : submitted && isCorrect
+                                                                ? 'bg-green-500 border-green-500 text-white'
+                                                                : 'bg-white border-gray-300 text-gray-500'
+                                                            }`}
+                                                    >
+                                                        {isSelected || (submitted && isCorrect) ? (
+                                                            <Check className="h-4 w-4" />
+                                                        ) : (
+                                                            opt.toUpperCase()
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-800">{currentQuestion.options[opt]}</span>
+                                                        {submitted && isCorrect && (
+                                                            <div className="text-xs text-green-600 mt-1">Correct Answer</div>
+                                                        )}
+                                                        {isIncorrect && (
+                                                            <div className="text-xs text-red-600 mt-1">Your Answer</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {(currentQuestion.explanation && (submitted || answers[currentQuestion._id])) && (
+                                    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                        <div className="flex items-center gap-2 text-blue-700 mb-2">
+                                            <Info className="h-4 w-4" />
+                                            <span className="font-medium">Explanation</span>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                        <p className="text-sm text-gray-700">
+                                            {currentQuestion.explanation}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Navigation */}
-                        <Card className="border-0 shadow-xl bg-white/60 backdrop-blur-sm mt-6">
-                            <CardContent className="p-6">
-                                <div className="flex flex-col space-y-6">
-                                    {/* Navigation Buttons - First Row */}
-                                    <div className="flex justify-between items-center">
-                                        <Button
-                                            onClick={() => setCurrentQuestionIndex(prev => Math.max(prev - 1, 0))}
-                                            disabled={currentQuestionIndex === 0}
-                                            variant="outline"
-                                            size="lg"
-                                            className="px-6 disabled:opacity-50"
+                        <div className="mt-8 bg-white rounded-xl shadow-md p-6">
+                            <div className="flex flex-col gap-6">
+                                <div className="flex justify-between">
+                                    <button
+                                        onClick={() => setCurrentQuestionIndex(prev => Math.max(prev - 1, 0))}
+                                        disabled={currentQuestionIndex === 0 || submitted}
+                                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                                    >
+                                        <ChevronLeft className="h-5 w-5" />
+                                        Previous
+                                    </button>
+
+                                    {currentQuestionIndex === questions.length - 1 ? (
+                                        <button
+                                            onClick={handleSubmitTest}
+                                            disabled={submitted || submitting}
+                                            className="flex items-center gap-2 px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
                                         >
-                                            <ChevronLeft className="h-4 w-4 mr-2" /> Previous
-                                        </Button>
-
-                                        {currentQuestionIndex === questions.length - 1 ? (
-                                            <Button
-                                                onClick={handleSubmitTest}
-                                                size="lg"
-                                                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8 py-3 shadow-lg"
-                                            >
-                                                Submit Quiz <Check className="h-4 w-4 ml-2" />
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                onClick={() => setCurrentQuestionIndex(prev => Math.min(prev + 1, questions.length - 1))}
-                                                variant="outline"
-                                                size="lg"
-                                                className="px-6"
-                                            >
-                                                Next <ChevronRight className="h-4 w-4 ml-2" />
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Question Numbers - Simplified without background */}
-                                    <div className="flex flex-wrap justify-center gap-2 mx-auto max-w-2xl">
-                                        {questions.map((q, index) => (
-                                            <Tooltip key={q._id}>
-                                                <TooltipTrigger asChild>
-                                                    <button
-                                                        onClick={() => setCurrentQuestionIndex(index)}
-                                                        className={`w-8 h-8 rounded-full text-xs font-medium transition-all duration-200 flex items-center justify-center ${index === currentQuestionIndex
-                                                            ? "bg-blue-600 text-white shadow-lg transform scale-110"
-                                                            : answers[q._id]
-                                                                ? markedForReview[q._id]
-                                                                    ? "text-yellow-700 border-2 border-yellow-300"
-                                                                    : "text-green-700 border-2 border-green-300"
-                                                                : "text-gray-600 hover:text-gray-800 border border-gray-300"
-                                                            }`}
-                                                    >
-                                                        {index + 1}
-                                                        {markedForReview[q._id] && (
-                                                            <span className="absolute -top-1 -right-1">
-                                                                <Bookmark className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Question {index + 1}</p>
-                                                    {answers[q._id] && <p>Answered: {answers[q._id]}</p>}
-                                                    {markedForReview[q._id] && <p>Marked for review</p>}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        ))}
-                                    </div>
-
-                                    {/* Status Information */}
-                                    <div className="flex justify-between items-center text-sm text-gray-500">
-                                        <div>
-                                            <span className="font-medium">{answeredCount}</span> of <span className="font-medium">{questions.length}</span> answered
-                                        </div>
-                                        <div>
-                                            <span className="font-medium">{timeLeft > 0 ? formatTime(timeLeft) : "Time's up!"}</span> remaining
-                                        </div>
-                                    </div>
+                                            {submitting ? (
+                                                <>
+                                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                                    Submitting...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Submit Quiz
+                                                    <Check className="h-5 w-5" />
+                                                </>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => setCurrentQuestionIndex(prev => Math.min(prev + 1, questions.length - 1))}
+                                            disabled={submitted}
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                                        >
+                                            Next
+                                            <ChevronRight className="h-5 w-5" />
+                                        </button>
+                                    )}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {questions.map((q, index) => (
+                                        <button
+                                            key={q._id}
+                                            onClick={() => setCurrentQuestionIndex(index)}
+                                            disabled={submitted}
+                                            className={`relative w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${index === currentQuestionIndex
+                                                ? 'bg-blue-500 text-white'
+                                                : answers[q._id]
+                                                    ? markedForReview[q._id]
+                                                        ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
+                                                        : submitted
+                                                            ? q.correctOption === answers[q._id]
+                                                                ? 'bg-green-100 text-green-800 border-2 border-green-300'
+                                                                : 'bg-red-100 text-red-800 border-2 border-red-300'
+                                                            : 'bg-green-100 text-green-800 border-2 border-green-300'
+                                                    : 'bg-gray-100 text-gray-800 border border-gray-300'
+                                                }`}
+                                        >
+                                            {index + 1}
+                                            {markedForReview[q._id] && (
+                                                <Bookmark className="absolute -mt-6 h-3 w-3 text-yellow-500" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
         </div>
     );
-}
+};
 
 export default Quiz;

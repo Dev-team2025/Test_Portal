@@ -15,7 +15,7 @@ function Landing() {
                 </h1>
             </div>
 
-            <div className="flex flex-col md:flex-row justify-between items-center mt-6 px-4 md:px-10">
+            <div className="  flex flex-col md:flex-row justify-around items-center mt-6 px-4 md:px-10">
                 <img
                     src={image}
                     className="w-full md:w-[550px] rounded-[30px] md:ml-20 "

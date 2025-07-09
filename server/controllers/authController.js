@@ -98,9 +98,12 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Update last login
-        user.last_login = new Date();
-        await user.save();
+        // Update last login without validation
+        await User.updateOne(
+            { _id: user._id },
+            { $set: { last_login: new Date() } },
+            { runValidators: false } // Disable validation for this update
+        );
 
         // Generate token
         const token = generateToken(user);

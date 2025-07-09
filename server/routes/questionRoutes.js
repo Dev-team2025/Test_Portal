@@ -26,7 +26,7 @@ router.post("/upload-excel", upload.single("file"), async (req, res) => {
         const data = xlsx.utils.sheet_to_json(sheet);
 
         const questions = data.map(row => ({
-            set: Number(row.set), // force to number
+            set: Number(row.set),
             question: row.question,
             options: {
                 a: row.option_a,
@@ -35,14 +35,21 @@ router.post("/upload-excel", upload.single("file"), async (req, res) => {
                 d: row.option_d,
             },
             correctOption: row.correctOption,
-            explanation: row.explanation,
+            explanation: row.explanation || "", // Make optional
+            type: row.type || "technical", // Add default if missing
+            difficulty: row.difficulty || "medium" // Add default if missing
         }));
 
         await Question.insertMany(questions);
         res.status(200).json({ message: "Excel uploaded successfully" });
     } catch (err) {
         console.error("Upload error:", err);
-        res.status(500).json({ error: "Upload failed", details: err.message });
+        res.status(500).json({
+            error: "Upload failed",
+            details: err.message,
+            requiredFields: "set, question, option_a, option_b, option_c, option_d, correctOption, type, difficulty",
+            optionalFields: "explanation"
+        });
     }
 });
 

@@ -6,11 +6,6 @@ const morgan = require("morgan");
 const connectDB = require("./config/db");
 const SchedulerService = require("./services/schedulerService");
 
-// Route imports
-const authRoutes = require("./routes/authRoutes");
-const questionRoutes = require("./routes/questionRoutes");
-const answerRoutes = require("./routes/answerRoutes");
-const reportRoutes = require("./routes/reportRoutes");
 
 // Initialize Express app
 const app = express();
@@ -18,20 +13,30 @@ const app = express();
 // Database connection
 connectDB();
 
-// Middlewares
+
+app.use(express.json());
 app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 app.use(morgan("dev"));
+// Route imports
+const authRoutes = require("./routes/authRoutes");
+const questionRoutes = require("./routes/questionRoutes");
+const answerRoutes = require("./routes/answerRoutes");
+const reportRoutes = require("./routes/reportRoutes");
+
 
 // API Routes
 app.use("/api/auth", authRoutes);
-app.use("/api/questions", questionRoutes);
+app.use('/api/questions', questionRoutes);
 app.use("/api/answers", answerRoutes);
 app.use("/api/report", reportRoutes);
+
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -99,4 +104,7 @@ process.on("SIGINT", () => {
     });
 });
 
-module.exports = server; 
+module.exports = server;
+
+
+
