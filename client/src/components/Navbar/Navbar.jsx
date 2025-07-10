@@ -31,8 +31,6 @@ function Navbar() {
         if (token) {
             try {
                 const decoded = jwtDecode(token);
-                console.log("Decoded token:", decoded);
-
                 setIsLoggedIn(true);
                 setEmail(decoded.email);
                 setUsername(decoded.name || decoded.email.split('@')[0]);
@@ -83,9 +81,9 @@ function Navbar() {
     };
 
     const navLinks = [
-        { path: "/", name: "Home", icon: <Home className="h-5 w-5" /> },
-        ...(isAdmin ? [{ path: "/admindashboard", name: "Admin Dashboard", icon: <Shield className="h-5 w-5" /> }] : []),
-        ...(isLoggedIn && !isAdmin ? [{ path: "/dashboard", name: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> }] : [])
+        { path: "/", name: "Home", icon: <Home /> },
+        ...(isAdmin ? [{ path: "/admindashboard", name: "Admin Dashboard", icon: <Shield /> }] : []),
+        ...(isLoggedIn && !isAdmin ? [{ path: "/dashboard", name: "Dashboard", icon: <LayoutDashboard /> }] : [])
     ];
 
     return (
@@ -99,9 +97,8 @@ function Navbar() {
                         </Link>
                     </div>
 
-                    {/* Desktop Navigation - Right Aligned */}
+                    {/* Desktop Navigation */}
                     <div className="hidden sm:flex sm:items-center sm:space-x-4">
-                        {/* Navigation links pushed to the right */}
                         <div className="flex space-x-8">
                             {navLinks.map((link) => (
                                 <NavLink
@@ -109,9 +106,13 @@ function Navbar() {
                                     to={link.path}
                                     active={location.pathname === link.path}
                                 >
-                                    <span className="flex items-center">
-                                        {link.icon}
-                                        <span className="ml-2">{link.name}</span>
+                                    <span className="flex items-center space-x-2 group">
+                                        <span className="group-hover:text-indigo-600 transition-colors duration-200">
+                                            {React.cloneElement(link.icon, {
+                                                className: "h-5 w-5 transition-transform duration-200 group-hover:scale-110"
+                                            })}
+                                        </span>
+                                        <span>{link.name}</span>
                                     </span>
                                 </NavLink>
                             ))}
@@ -128,7 +129,7 @@ function Navbar() {
                                         aria-expanded="false"
                                         aria-haspopup="true"
                                     >
-                                        <UserCircle className="h-8 w-8 text-gray-500" />
+                                        <UserCircle className="h-8 w-8 text-gray-500 hover:text-indigo-600 transition-transform duration-200 hover:scale-110" />
                                         <div className="text-left">
                                             <div className="font-medium text-gray-700">{username}</div>
                                             <div className="text-xs text-gray-500 truncate max-w-[120px]">{email}</div>
@@ -163,7 +164,7 @@ function Navbar() {
                             ) : (
                                 <Link
                                     to="/login"
-                                    className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-indigo-600 hover:text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                 >
                                     <LogIn className="h-4 w-4 mr-2" />
                                     Login
@@ -178,15 +179,9 @@ function Navbar() {
                             onClick={toggleMobileMenu}
                             type="button"
                             className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-                            aria-controls="mobile-menu"
-                            aria-expanded="false"
                         >
                             <span className="sr-only">Open main menu</span>
-                            {mobileMenuOpen ? (
-                                <X className="block h-6 w-6" />
-                            ) : (
-                                <Menu className="block h-6 w-6" />
-                            )}
+                            {mobileMenuOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
                         </button>
                     </div>
                 </div>
@@ -199,19 +194,23 @@ function Navbar() {
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     className="sm:hidden"
-                    id="mobile-menu"
                 >
                     <div className="pt-2 pb-3 space-y-1">
                         {navLinks.map((link) => (
                             <Link
                                 key={link.path}
                                 to={link.path}
-                                className={`${location.pathname === link.path ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'} border-l-4 block pl-3 pr-4 py-2 text-base font-medium`}
+                                className={`${location.pathname === link.path
+                                        ? "bg-indigo-50 border-indigo-500 text-indigo-700"
+                                        : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                                    } border-l-4 block pl-3 pr-4 py-2 text-base font-medium`}
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                <div className="flex items-center">
-                                    {link.icon}
-                                    <span className="ml-3">{link.name}</span>
+                                <div className="flex items-center space-x-3 group">
+                                    <span className="text-gray-500 group-hover:text-indigo-600 transition">
+                                        {React.cloneElement(link.icon, { className: "h-5 w-5" })}
+                                    </span>
+                                    <span>{link.name}</span>
                                 </div>
                             </Link>
                         ))}
@@ -257,7 +256,10 @@ function NavLink({ to, active, children, ...props }) {
     return (
         <Link
             to={to}
-            className={`${active ? "border-indigo-500 text-gray-900" : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200`}
+            className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${active
+                    ? "border-indigo-500 text-indigo-700"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`}
             {...props}
         >
             {children}

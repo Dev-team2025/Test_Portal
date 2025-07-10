@@ -1,78 +1,77 @@
+// controllers/reportController.js
+const mongoose = require('mongoose');
 const UserAnswer = require("../models/UserAnswer");
 const User = require("../models/User");
 const Question = require("../models/Questions");
+const QuizResult = require("../models/QuizResult");
 
 exports.getQuizReport = async (req, res) => {
     try {
         const { quizSet, college, email } = req.query;
 
+        // Validate input parameters
         if (!quizSet) {
-            return res.status(400).json({ error: "Quiz set parameter is required" });
+            return res.status(400).json({
+                success: false,
+                message: "quizSet parameter is required"
+            });
         }
 
-        // Build user filter
-        const userFilter = {};
-        if (college) userFilter.college = new RegExp(college, 'i');
-        if (email) userFilter.email = new RegExp(email, 'i');
+        // Convert quizSet to number if it's numeric
+        const quizSetNumber = isNaN(quizSet) ? quizSet : Number(quizSet);
 
-        // Get all questions for this quiz set first
-        const questions = await Question.find({ setNumber: quizSet })
+        // Build the base query for users
+        const userQuery = {};
+        if (college) userQuery.college = new RegExp(college, 'i');
+        if (email) userQuery.email = new RegExp(email, 'i');
+
+        // Get all users matching the criteria
+        const users = await User.find(userQuery).lean();
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No users found matching the criteria"
+            });
+        }
+
+        // Get all questions for the quiz set
+        const questions = await Question.find({ setNumber: quizSetNumber })
             .sort({ questionNumber: 1 })
             .lean();
 
-        // Get all answers for the selected quiz set with question details
-        const answers = await UserAnswer.find({ setNumber: quizSet })
+        if (questions.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No questions found for this quiz set"
+            });
+        }
+
+        // Get all answers for these users and quiz set
+        const answers = await UserAnswer.find({
+            userId: { $in: users.map(u => u._id) },
+            setNumber: quizSetNumber
+        })
             .populate({
                 path: "questionId",
-                select: "questionText options correctOption"
+                select: "questionText options correctOption questionNumber"
             })
             .lean();
 
-        // Group answers by user and include complete question details
-        const userAnswersMap = {};
-        answers.forEach(answer => {
-            if (!userAnswersMap[answer.userId]) {
-                userAnswersMap[answer.userId] = [];
-            }
+        // Get all quiz results for these users and quiz set
+        const quizResults = await QuizResult.find({
+            userId: { $in: users.map(u => u._id) },
+            setNumber: quizSetNumber
+        }).lean();
 
-            const question = questions.find(q => q._id.toString() === answer.questionId._id.toString());
-            const userAnswer = {
-                questionId: answer.questionId._id,
-                questionText: answer.questionId.questionText,
-                options: answer.questionId.options, // Include all options
-                correctOption: answer.questionId.correctOption,
-                selectedOption: answer.selectedOption,
-                isCorrect: answer.isCorrect,
-                selectedOptionText: answer.questionId.options[answer.selectedOption] // Get the actual text of selected option
-            };
+        // Prepare response
+        const response = users.map(user => {
+            const userAnswers = answers.filter(a => a.userId.toString() === user._id.toString());
+            const userQuizResult = quizResults.find(r => r.userId.toString() === user._id.toString());
+            const correctAnswers = userAnswers.filter(a => a.isCorrect).length;
+            const totalMarks = userAnswers.reduce((sum, a) => sum + (a.marks || 0), 0);
 
-            userAnswersMap[answer.userId].push(userAnswer);
-        });
-
-        // Get user details and prepare report
-        const reportData = [];
-        const users = await User.find(userFilter)
-            .where('_id').in(Object.keys(userAnswersMap))
-            .lean();
-
-        for (const user of users) {
-            const userAnswers = userAnswersMap[user._id.toString()] || [];
-
-            // Sort answers to match question order and include all questions
-            const sortedAnswers = questions.map(question => {
-                const answer = userAnswers.find(a => a.questionId.toString() === question._id.toString());
-                return answer || {
-                    questionId: question._id,
-                    questionText: question.questionText,
-                    options: question.options,
-                    correctOption: question.correctOption,
-                    selectedOption: 'N/A',
-                    selectedOptionText: 'Not Attempted',
-                    isCorrect: false
-                };
-            });
-
-            reportData.push({
+            return {
                 userId: user._id,
                 fullname: user.fullname,
                 email: user.email,
@@ -80,17 +79,42 @@ exports.getQuizReport = async (req, res) => {
                 usn: user.usn,
                 branch: user.branch,
                 yop: user.yop,
-                answers: sortedAnswers,
-                questions: questions
-            });
-        }
+                answers: questions.map(question => {
+                    const answer = userAnswers.find(a =>
+                        a.questionId && a.questionId._id.toString() === question._id.toString()
+                    );
 
-        res.json(reportData);
+                    return {
+                        questionId: question._id,
+                        questionNumber: question.questionNumber,
+                        questionText: question.questionText,
+                        selectedOption: answer ? answer.selectedOption : 'N/A',
+                        isCorrect: answer ? answer.isCorrect : false,
+                        marks: answer ? answer.marks : 0
+                    };
+                }),
+                totalScore: correctAnswers,
+                totalMarks: userQuizResult ? userQuizResult.totalMarks : totalMarks,
+                percentage: questions.length > 0
+                    ? ((correctAnswers / questions.length) * 100).toFixed(2)
+                    : 0,
+                submissionDate: userQuizResult ? userQuizResult.timestamp : null
+            };
+        });
+
+        res.status(200).json(response);
     } catch (err) {
-        console.error("Error generating quiz report:", err);
+        console.error("Error fetching quiz report:", err);
         res.status(500).json({
-            error: "Internal Server Error",
-            message: err.message
+            success: false,
+            message: "Internal Server Error",
+            error: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
     }
+};
+
+// Keep your existing getUserQuizResults method
+exports.getUserQuizResults = async (req, res) => {
+    // ... (your existing implementation)
 };

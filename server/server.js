@@ -1,11 +1,10 @@
+// server.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
 const connectDB = require("./config/db");
-const SchedulerService = require("./services/schedulerService");
-
 
 // Initialize Express app
 const app = express();
@@ -13,30 +12,34 @@ const app = express();
 // Database connection
 connectDB();
 
-
+// Middleware
 app.use(express.json());
-app.use(cors({
-    origin: 'http://localhost:5173', // Adjust if you're using different frontend URL
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Quiz-Start-Time']
-}));
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:5173");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-quiz-start-time");
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 app.use(morgan("dev"));
+
 // Route imports
 const authRoutes = require("./routes/authRoutes");
 const questionRoutes = require("./routes/questionRoutes");
 const answerRoutes = require("./routes/answerRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 
-
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use("/api/answers", answerRoutes);
-app.use("/api/report", reportRoutes);
-
+app.use("/api/reports", reportRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -48,7 +51,7 @@ app.get("/api/health", (req, res) => {
     });
 });
 
-// 404 Handler
+// Error handlers
 app.use((req, res) => {
     res.status(404).json({
         success: false,
@@ -57,15 +60,12 @@ app.use((req, res) => {
     });
 });
 
-// Error handler middleware
 app.use((err, req, res, next) => {
     console.error(`[${new Date().toISOString()}] Error:`, err.stack);
-
     const statusCode = err.statusCode || 500;
     const message = process.env.NODE_ENV === "production"
         ? "Something went wrong"
         : err.message;
-
     res.status(statusCode).json({
         success: false,
         message: message,
@@ -73,38 +73,8 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Initialize schedulers
-const scheduler = new SchedulerService();
-
 // Start server
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-    console.log(`\n🚀 Server information:`);
-    console.log(`   Mode: ${process.env.NODE_ENV || "development"}`);
-    console.log(`   Port: ${PORT}`);
-    console.log(`   API Base: http://localhost:${PORT}/api`);
-    console.log(`   Database: ${process.env.MONGO_URI ? "Connected" : "Not configured"}`);
-    console.log(`   Schedulers: Active\n`);
+app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`);
 });
-
-// Handle graceful shutdown
-process.on("SIGTERM", () => {
-    console.log("SIGTERM received. Shutting down gracefully...");
-    server.close(() => {
-        console.log("Server closed");
-        process.exit(0);
-    });
-});
-
-process.on("SIGINT", () => {
-    console.log("SIGINT received. Shutting down gracefully...");
-    server.close(() => {
-        console.log("Server closed");
-        process.exit(0);
-    });
-});
-
-module.exports = server;
-
-
-

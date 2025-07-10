@@ -7,6 +7,7 @@ import {
     BarChart2, Award, Home, RotateCw, Info, Maximize2
 } from 'lucide-react';
 import { jwtDecode } from "jwt-decode";
+import AlertMessage from '../AlertMessage/AlertMessage';
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
@@ -205,7 +206,7 @@ const Quiz = () => {
                 answers: formattedAnswers
             }, {
                 headers: {
-                    'X-Quiz-Start-Time': startTime
+                    'x-quiz-start-time': startTime
                 }
             });
 
@@ -351,6 +352,7 @@ const Quiz = () => {
             {showWarningModal && <WarningModal />}
 
             <div className="max-w-6xl mx-auto">
+                <AlertMessage />
                 <div className="bg-white rounded-xl shadow-md p-6 mb-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div className="w-full md:w-auto">
@@ -433,6 +435,7 @@ const Quiz = () => {
                     </div>
                 ) : (
                     <>
+
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div className="bg-white rounded-xl shadow-md overflow-hidden">
                                 <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
