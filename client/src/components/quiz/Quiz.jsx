@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
     CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, Check,
     Trophy, Target, AlertTriangle, Loader2, Bookmark, Flag,
-    BarChart2, Award, Home, RotateCw, Info
+    BarChart2, Award, Home, RotateCw, Info, Maximize2
 } from 'lucide-react';
+import { jwtDecode } from "jwt-decode";
 
-// Create axios instance with base configuration
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
     withCredentials: true,
@@ -24,59 +24,133 @@ const Quiz = () => {
     const [markedForReview, setMarkedForReview] = useState({});
     const [submitted, setSubmitted] = useState(false);
     const [score, setScore] = useState(0);
-    const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes
+    const [timeLeft, setTimeLeft] = useState(1800);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showConfetti, setShowConfetti] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [visibilityWarning, setVisibilityWarning] = useState(0);
+    const [showWarningModal, setShowWarningModal] = useState(false);
+    const [fullscreen, setFullscreen] = useState(false);
 
-    // Fetch questions
+    // Disable text selection, right-click, and keyboard shortcuts
     useEffect(() => {
-        const fetchQuestions = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                // Validate setKey first
-                if (!setKey || !['1', '2', '3'].includes(setKey)) {
-                    throw new Error("Invalid quiz set selected");
-                }
-
-                const res = await api.get(`/questions/weekly-questions?card=${setKey}`);
-
-                if (!res.data || !Array.isArray(res.data)) {
-                    throw new Error("Invalid response format from server");
-                }
-
-                if (res.data.length === 0) {
-                    throw new Error("No questions available for this set");
-                }
-
-                setQuestions(res.data);
-
-                // Initialize states
-                const initialMarked = {};
-                const initialAnswers = {};
-                res.data.forEach(q => {
-                    initialMarked[q._id] = false;
-                    initialAnswers[q._id] = null;
-                });
-                setMarkedForReview(initialMarked);
-                setAnswers(initialAnswers);
-
-                setLoading(false);
-            } catch (err) {
-                console.error("Error fetching questions:", err);
-                setError(err.response?.data?.message || err.message || "Failed to load questions");
-                setLoading(false);
-                setQuestions([]);
+        const preventDefault = (e) => {
+            if (
+                e.key === 'F12' ||
+                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+                (e.ctrlKey && e.shiftKey && e.key === 'J') ||
+                (e.ctrlKey && e.key === 'U') ||
+                e.key === 'PrintScreen'
+            ) {
+                e.preventDefault();
+                return false;
             }
         };
 
-        fetchQuestions();
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('selectstart', (e) => e.preventDefault());
+        document.addEventListener('keydown', preventDefault);
+
+        return () => {
+            document.removeEventListener('contextmenu', (e) => e.preventDefault());
+            document.removeEventListener('selectstart', (e) => e.preventDefault());
+            document.removeEventListener('keydown', preventDefault);
+        };
+    }, []);
+
+    // Fullscreen handling
+    const handleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen()
+                .then(() => setFullscreen(true))
+                .catch(err => console.error('Fullscreen error:', err));
+        } else {
+            document.exitFullscreen()
+                .then(() => setFullscreen(false));
+        }
+    };
+
+    // Detect fullscreen changes
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setFullscreen(!!document.fullscreenElement);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+    // Tab switching detection
+    useEffect(() => {
+        if (submitted || loading || questions.length === 0) return;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                const newCount = visibilityWarning + 1;
+                setVisibilityWarning(newCount);
+                setShowWarningModal(true);
+
+                if (newCount >= 3) {
+                    handleSubmitTest();
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [submitted, loading, questions.length, visibilityWarning]);
+
+    const fetchQuestions = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            if (!setKey || !['1', '2', '3'].includes(setKey)) {
+                throw new Error("Invalid quiz set selected");
+            }
+
+            // Store start time in localStorage
+            localStorage.setItem('quizStartTime', Date.now());
+
+            const res = await api.get(`/questions/weekly-questions?card=${setKey}`);
+
+            if (!res.data || !Array.isArray(res.data)) {
+                throw new Error("Invalid response format from server");
+            }
+
+            if (res.data.length === 0) {
+                throw new Error("No questions available for this set");
+            }
+
+            setQuestions(res.data);
+
+            const initialMarked = {};
+            const initialAnswers = {};
+            res.data.forEach(q => {
+                initialMarked[q._id] = false;
+                initialAnswers[q._id] = null;
+            });
+            setMarkedForReview(initialMarked);
+            setAnswers(initialAnswers);
+
+            setLoading(false);
+        } catch (err) {
+            console.error("Error fetching questions:", err);
+            setError(err.response?.data?.message || err.message || "Failed to load questions");
+            setLoading(false);
+            setQuestions([]);
+        }
     }, [setKey]);
 
-    // Timer effect
+    useEffect(() => {
+        fetchQuestions();
+    }, [fetchQuestions]);
+
     useEffect(() => {
         if (submitted || loading || questions.length === 0) return;
 
@@ -96,20 +170,12 @@ const Quiz = () => {
 
     const handleAnswerSelect = (questionId, selectedOption) => {
         if (submitted) return;
-
-        setAnswers(prev => ({
-            ...prev,
-            [questionId]: selectedOption
-        }));
+        setAnswers(prev => ({ ...prev, [questionId]: selectedOption }));
     };
 
     const toggleMarkForReview = (questionId) => {
         if (submitted) return;
-
-        setMarkedForReview(prev => ({
-            ...prev,
-            [questionId]: !prev[questionId]
-        }));
+        setMarkedForReview(prev => ({ ...prev, [questionId]: !prev[questionId] }));
     };
 
     const handleSubmitTest = async () => {
@@ -117,45 +183,99 @@ const Quiz = () => {
 
         try {
             setSubmitting(true);
+            setError(null);
 
-            const response = await api.post("/answers/store", {
-                answers,
-                questionIds: questions.map(q => q._id),
-                set: setKey
-            });
+            const token = localStorage.getItem("token");
+            const userData = jwtDecode(token);
+            const userId = userData?._id || userData?.id;
 
-            if (!response.data) {
-                throw new Error("No response data received");
+            if (!userId) {
+                throw new Error("User not authenticated");
             }
 
-            setScore(response.data.score || 0);
-            setSubmitted(true);
-            setSubmitting(false);
+            const formattedAnswers = questions.map(q => ({
+                questionId: q._id,
+                setNumber: q.set?.toString() || setKey,
+                selectedOption: answers[q._id]
+            }));
 
-            if ((response.data.score || 0) >= questions.length * 0.7) {
+            const startTime = localStorage.getItem('quizStartTime');
+            const response = await api.post("/answers/store", {
+                userId,
+                answers: formattedAnswers
+            }, {
+                headers: {
+                    'X-Quiz-Start-Time': startTime
+                }
+            });
+
+            // Update questions with server's evaluation
+            const updatedQuestions = questions.map(q => {
+                const serverAnswer = response.data.answers.find(a =>
+                    a.questionId === q._id
+                );
+                return {
+                    ...q,
+                    isCorrect: serverAnswer?.isCorrect || false,
+                    serverCorrectOption: serverAnswer?.isCorrect ?
+                        answers[q._id] : null
+                };
+            });
+
+            setQuestions(updatedQuestions);
+            setScore(response.data.correctAnswers);
+            setSubmitted(true);
+
+            if (response.data.correctAnswers >= questions.length * 0.7) {
                 setShowConfetti(true);
                 setTimeout(() => setShowConfetti(false), 5000);
             }
         } catch (err) {
             console.error("Error submitting answers:", err);
-            setError(err.response?.data?.message || err.message || "Failed to submit answers");
+            setError(err.response?.data?.error || err.message || "Failed to submit answers");
+        } finally {
             setSubmitting(false);
         }
     };
 
-    // Format time as MM:SS
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Get time color based on remaining time
     const getTimeColor = () => {
         if (timeLeft > 600) return "text-green-600 bg-green-50 border-green-200";
         if (timeLeft > 300) return "text-yellow-600 bg-yellow-50 border-yellow-200";
         return "text-red-600 bg-red-50 border-red-200";
     };
+
+    const WarningModal = () => (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+                <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-center mb-4">
+                    {visibilityWarning >= 3 ? 'Quiz Submitted!' : 'Warning'}
+                </h2>
+                <p className="text-center mb-6">
+                    {visibilityWarning >= 3
+                        ? 'Your quiz has been submitted due to multiple tab switches.'
+                        : `Please stay on this page. ${3 - visibilityWarning} more warnings will result in automatic submission.`}
+                </p>
+                <button
+                    onClick={() => {
+                        setShowWarningModal(false);
+                        if (visibilityWarning >= 3) {
+                            navigate("/dashboard");
+                        }
+                    }}
+                    className="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                    {visibilityWarning >= 3 ? 'View Results' : 'I Understand'}
+                </button>
+            </div>
+        </div>
+    );
 
     if (loading) {
         return (
@@ -217,7 +337,7 @@ const Quiz = () => {
     const answeredCount = Object.values(answers).filter(a => a !== null).length;
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4">
+        <div className="min-h-screen bg-gray-50 p-4 select-none">
             {showConfetti && (
                 <div className="fixed inset-0 z-50 pointer-events-none">
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -228,8 +348,9 @@ const Quiz = () => {
                 </div>
             )}
 
+            {showWarningModal && <WarningModal />}
+
             <div className="max-w-6xl mx-auto">
-                {/* Quiz Header */}
                 <div className="bg-white rounded-xl shadow-md p-6 mb-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div className="w-full md:w-auto">
@@ -263,6 +384,14 @@ const Quiz = () => {
                                 <Clock className="h-5 w-5" />
                                 <span className="font-bold">{formatTime(timeLeft)}</span>
                             </div>
+
+                            <button
+                                onClick={handleFullscreen}
+                                className="flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 rounded-lg border border-purple-200 hover:bg-purple-100"
+                            >
+                                <Maximize2 className="h-5 w-5" />
+                                <span>{fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -305,7 +434,6 @@ const Quiz = () => {
                 ) : (
                     <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* Question Panel */}
                             <div className="bg-white rounded-xl shadow-md overflow-hidden">
                                 <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
                                     <div className="flex items-center gap-2">
@@ -345,7 +473,6 @@ const Quiz = () => {
                                 </div>
                             </div>
 
-                            {/* Options Panel */}
                             <div className="bg-white rounded-xl shadow-md p-6">
                                 <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                                     <Target className="h-5 w-5 text-blue-600" />
@@ -355,8 +482,9 @@ const Quiz = () => {
                                 <div className="space-y-4">
                                     {['a', 'b', 'c', 'd'].map(opt => {
                                         const isSelected = answers[currentQuestion._id] === opt.toUpperCase();
-                                        const isCorrect = submitted && currentQuestion.correctOption === opt.toUpperCase();
-                                        const isIncorrect = submitted && isSelected && !isCorrect;
+                                        const isCorrect = submitted && currentQuestion.isCorrect && isSelected;
+                                        const isServerCorrect = submitted && !isSelected &&
+                                            currentQuestion.serverCorrectOption === opt.toUpperCase();
 
                                         return (
                                             <button
@@ -368,7 +496,7 @@ const Quiz = () => {
                                                             ? 'border-green-500 bg-green-50'
                                                             : 'border-red-500 bg-red-50'
                                                         : 'border-blue-500 bg-blue-50'
-                                                    : submitted && isCorrect
+                                                    : isServerCorrect
                                                         ? 'border-green-500 bg-green-50'
                                                         : 'border-gray-200 hover:border-gray-300'
                                                     }`}
@@ -382,12 +510,12 @@ const Quiz = () => {
                                                                     ? 'bg-green-500 border-green-500 text-white'
                                                                     : 'bg-red-500 border-red-500 text-white'
                                                                 : 'bg-blue-500 border-blue-500 text-white'
-                                                            : submitted && isCorrect
+                                                            : isServerCorrect
                                                                 ? 'bg-green-500 border-green-500 text-white'
                                                                 : 'bg-white border-gray-300 text-gray-500'
                                                             }`}
                                                     >
-                                                        {isSelected || (submitted && isCorrect) ? (
+                                                        {isSelected || isServerCorrect ? (
                                                             <Check className="h-4 w-4" />
                                                         ) : (
                                                             opt.toUpperCase()
@@ -395,10 +523,10 @@ const Quiz = () => {
                                                     </div>
                                                     <div>
                                                         <span className="text-gray-800">{currentQuestion.options[opt]}</span>
-                                                        {submitted && isCorrect && (
+                                                        {isServerCorrect && (
                                                             <div className="text-xs text-green-600 mt-1">Correct Answer</div>
                                                         )}
-                                                        {isIncorrect && (
+                                                        {submitted && isSelected && !isCorrect && (
                                                             <div className="text-xs text-red-600 mt-1">Your Answer</div>
                                                         )}
                                                     </div>
@@ -422,7 +550,6 @@ const Quiz = () => {
                             </div>
                         </div>
 
-                        {/* Navigation */}
                         <div className="mt-8 bg-white rounded-xl shadow-md p-6">
                             <div className="flex flex-col gap-6">
                                 <div className="flex justify-between">
@@ -477,7 +604,7 @@ const Quiz = () => {
                                                     ? markedForReview[q._id]
                                                         ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
                                                         : submitted
-                                                            ? q.correctOption === answers[q._id]
+                                                            ? q.isCorrect
                                                                 ? 'bg-green-100 text-green-800 border-2 border-green-300'
                                                                 : 'bg-red-100 text-red-800 border-2 border-red-300'
                                                             : 'bg-green-100 text-green-800 border-2 border-green-300'

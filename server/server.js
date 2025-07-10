@@ -16,10 +16,10 @@ connectDB();
 
 app.use(express.json());
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: 'http://localhost:5173', // Adjust if you're using different frontend URL
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Quiz-Start-Time']
 }));
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
