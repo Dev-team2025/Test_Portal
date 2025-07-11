@@ -39,7 +39,7 @@ const reportRoutes = require("./routes/reportRoutes");
 app.use("/api/auth", authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use("/api/answers", answerRoutes);
-app.use("/api/reports", reportRoutes);
+app.use('/api/result', reportRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

@@ -97,4 +97,4 @@ questionSchema.pre('save', function (next) {
     next();
 });
 
-module.exports = mongoose.model("Question", questionSchema);
+module.exports = mongoose.model("Questions", questionSchema);
