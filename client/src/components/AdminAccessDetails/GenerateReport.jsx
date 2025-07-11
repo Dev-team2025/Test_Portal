@@ -5,9 +5,7 @@ import moment from 'moment';
 function getCurrentWeekSets(totalSets = 52) {
     const now = moment();
     const weekOfYear = now.isoWeek();
-
     const startSet = ((weekOfYear - 1) * 3) % totalSets + 1;
-
     return [
         startSet,
         startSet % totalSets + 1,
@@ -17,10 +15,13 @@ function getCurrentWeekSets(totalSets = 52) {
 
 function ResultTable() {
     const [groupedResults, setGroupedResults] = useState({});
+    const [filteredResults, setFilteredResults] = useState({});
     const [questionDetails, setQuestionDetails] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedSet, setSelectedSet] = useState(null);
     const [currentWeekSets, setCurrentWeekSets] = useState([]);
+    const [collegeList, setCollegeList] = useState([]);
+    const [selectedCollege, setSelectedCollege] = useState("All");
 
     useEffect(() => {
         const sets = getCurrentWeekSets();
@@ -39,6 +40,7 @@ function ResultTable() {
 
                 const grouped = {};
                 const questionMap = new Map();
+                const collegeSet = new Set();
 
                 answers.forEach((ans) => {
                     const userId = ans.userId?._id;
@@ -52,6 +54,9 @@ function ResultTable() {
                     ) {
                         return;
                     }
+
+                    const college = ans.userId?.collegename?.trim();
+                    if (college) collegeSet.add(college);
 
                     const qid = question._id;
                     if (!questionMap.has(qid)) {
@@ -79,8 +84,12 @@ function ResultTable() {
                     a.text.localeCompare(b.text)
                 );
 
+                const sortedColleges = Array.from(collegeSet).sort();
+
                 setQuestionDetails(sortedQuestions);
                 setGroupedResults(grouped);
+                setCollegeList(sortedColleges);
+                setSelectedCollege("All");
             } catch (error) {
                 console.error('Error fetching results:', error);
             } finally {
@@ -91,27 +100,58 @@ function ResultTable() {
         fetchResults();
     }, [selectedSet]);
 
+    useEffect(() => {
+        if (selectedCollege === "All") {
+            setFilteredResults(groupedResults);
+        } else {
+            const filtered = {};
+            for (const [uid, data] of Object.entries(groupedResults)) {
+                if (data.user.collegename === selectedCollege) {
+                    filtered[uid] = data;
+                }
+            }
+            setFilteredResults(filtered);
+        }
+    }, [selectedCollege, groupedResults]);
+
     if (loading) return <p>Loading results...</p>;
 
     return (
         <div className="p-4">
             <h2 className="text-xl font-bold mb-4">Weekly Quiz Results</h2>
 
-            {/* Dropdown Filter */}
-            <div className="mb-4">
-                <label htmlFor="set-select" className="mr-2 font-medium">Select Quiz Set:</label>
-                <select
-                    id="set-select"
-                    value={selectedSet}
-                    onChange={(e) => setSelectedSet(Number(e.target.value))}
-                    className="border border-gray-300 rounded p-2"
-                >
-                    {currentWeekSets.map((set) => (
-                        <option key={set} value={set}>
-                            Set {set}
-                        </option>
-                    ))}
-                </select>
+            {/* Filters */}
+            <div className="flex gap-4 flex-wrap mb-4">
+                {/* Set Filter */}
+                <div>
+                    <label htmlFor="set-select" className="mr-2 font-medium">Select Quiz Set:</label>
+                    <select
+                        id="set-select"
+                        value={selectedSet}
+                        onChange={(e) => setSelectedSet(Number(e.target.value))}
+                        className="border border-gray-300 rounded p-2"
+                    >
+                        {currentWeekSets.map((set) => (
+                            <option key={set} value={set}>Set {set}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* College Filter */}
+                <div>
+                    <label htmlFor="college-select" className="mr-2 font-medium">Filter by College:</label>
+                    <select
+                        id="college-select"
+                        value={selectedCollege}
+                        onChange={(e) => setSelectedCollege(e.target.value)}
+                        className="border border-gray-300 rounded p-2"
+                    >
+                        <option value="All">All</option>
+                        {collegeList.map((college) => (
+                            <option key={college} value={college}>{college}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {/* Table */}
@@ -132,7 +172,7 @@ function ResultTable() {
                         </tr>
                     </thead>
                     <tbody>
-                        {Object.values(groupedResults).map(({ user, answers }) => (
+                        {Object.values(filteredResults).map(({ user, answers }) => (
                             <tr key={user._id}>
                                 <td className="border p-2">{user.fullname || '-'}</td>
                                 <td className="border p-2">{user.usn || '-'}</td>
