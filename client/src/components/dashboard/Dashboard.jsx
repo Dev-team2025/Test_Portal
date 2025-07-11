@@ -128,23 +128,32 @@ export default function Dashboard() {
                 <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-200">
                     <h3 className="text-sm font-semibold text-gray-600 mb-2">
                         {currentMonthName} {currentYear} - Week {currentWeekOfMonth}
-                    </h3>
-                    <div className="flex gap-2">
-                        {currentWeekDates.map((date, i) => {
-                            const isCurrentDate = date === currentDate;
-                            return (
-                                <div
-                                    key={i}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm 
-                                        ${isCurrentDate
-                                            ? "bg-blue-500 text-white font-bold shadow-md"
-                                            : "bg-gray-100 text-gray-600"}`}
-                                >
-                                    {date}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    </h3><br/>
+                   {/* Calendar with weekday labels */}
+<div className="flex flex-col">
+  <div className="flex gap-2 justify-center text-xs text-gray-500 font-semibold mb-1">
+    {['S', 'M', 'T', 'W', 'Th', 'F', 'S'].map((day, idx) => (
+      <div key={idx} className="w-8 text-center">{day}</div>
+    ))}
+  </div>
+  <div className="flex gap-2">
+    {currentWeekDates.map((date, i) => {
+      const isCurrentDate = date === currentDate;
+      return (
+        <div
+          key={i}
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm 
+            ${isCurrentDate
+              ? "bg-blue-500 text-white font-bold shadow-md"
+              : "bg-gray-100 text-gray-600"}`}
+        >
+          {date}
+        </div>
+      );
+    })}
+  </div>
+</div>
+
                 </div>
             </div>
 

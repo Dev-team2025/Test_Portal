@@ -11,7 +11,8 @@ import {
   FileDown,
   School,
   FileText,
-  FileType2
+  FileType2,
+  X
 } from 'lucide-react';
 
 function getCurrentWeekSets(totalSets = 52) {
@@ -35,6 +36,9 @@ function ResultTable() {
   const [allColleges, setAllColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState('');
   const [page, setPage] = useState(1);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewType, setPreviewType] = useState(null);
+  const [previewData, setPreviewData] = useState([]);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -112,11 +116,15 @@ function ResultTable() {
   const paginatedResults = filteredResults.slice((page - 1) * itemsPerPage, page * itemsPerPage);
   const totalPages = Math.ceil(filteredResults.length / itemsPerPage);
 
-  const handleExportExcel = () => {
+  const generatePreviewData = (type) => {
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
-    const data = filteredResults.map(({ user, answers }) => {
+    const data = filteredResults.slice(0, 5).map(({ user, answers }) => {
       const row = [
-        user.fullname || '-', user.usn || '-', user.collegename || '-', user.branch || '-', user.email || '-',
+        user.fullname || '-', 
+        user.usn || '-', 
+        user.collegename || '-', 
+        user.branch || '-', 
+        user.email || '-',
         marksMap[`${user._id}_${selectedSet}`] ?? '-'
       ];
       questionDetails.forEach((q) => {
@@ -125,6 +133,30 @@ function ResultTable() {
       });
       return row;
     });
+    
+    setPreviewData([headers, ...data]);
+    setPreviewType(type);
+    setShowPreview(true);
+  };
+
+  const handleExportExcel = () => {
+    const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
+    const data = filteredResults.map(({ user, answers }) => {
+      const row = [
+        user.fullname || '-', 
+        user.usn || '-', 
+        user.collegename || '-', 
+        user.branch || '-', 
+        user.email || '-',
+        marksMap[`${user._id}_${selectedSet}`] ?? '-'
+      ];
+      questionDetails.forEach((q) => {
+        const ans = answers[q._id];
+        row.push(ans ? `${ans.selectedOption} (${ans.isCorrect ? 'Correct' : 'Wrong'})` : '-');
+      });
+      return row;
+    });
+    
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `Set_${selectedSet}`);
@@ -132,6 +164,7 @@ function ResultTable() {
     const filename = `Quiz_Results_Set${selectedSet}_${ts}.xlsx`;
     const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     saveAs(new Blob([buffer], { type: 'application/octet-stream' }), filename);
+    setShowPreview(false);
   };
 
   const handleExportPDF = () => {
@@ -139,9 +172,14 @@ function ResultTable() {
     doc.text(`Quiz Report - Set ${selectedSet}`, 14, 14);
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total'];
     const body = filteredResults.map(({ user }) => [
-      user.fullname || '-', user.usn || '-', user.collegename || '-', user.branch || '-', user.email || '-',
+      user.fullname || '-', 
+      user.usn || '-', 
+      user.collegename || '-', 
+      user.branch || '-', 
+      user.email || '-',
       marksMap[`${user._id}_${selectedSet}`] ?? '-'
     ]);
+    
     autoTable(doc, {
       head: [headers],
       body,
@@ -149,8 +187,10 @@ function ResultTable() {
       styles: { fontSize: 7 },
       headStyles: { fillColor: [22, 160, 133] }
     });
+    
     const ts = moment().format('YYYY-MM-DD_HH-mm-ss');
     doc.save(`Quiz_Results_Set${selectedSet}_${ts}.pdf`);
+    setShowPreview(false);
   };
 
   if (loading) {
@@ -198,7 +238,6 @@ function ResultTable() {
           </select>
         </div>
 
-        {/* Download dropdown */}
         <div className="relative group">
           <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 transition">
             <FileDown className="w-4 h-4" />
@@ -206,13 +245,13 @@ function ResultTable() {
           </button>
           <div className="absolute z-10 hidden group-hover:block bg-white border mt-1 rounded shadow-md">
             <button
-              onClick={handleExportExcel}
+              onClick={() => generatePreviewData('excel')}
               className="px-4 py-2 text-sm w-full hover:bg-gray-100 flex items-center gap-2"
             >
               <FileType2 className="w-4 h-4 text-green-600" /> Excel
             </button>
             <button
-              onClick={handleExportPDF}
+              onClick={() => generatePreviewData('pdf')}
               className="px-4 py-2 text-sm w-full hover:bg-gray-100 flex items-center gap-2"
             >
               <FileText className="w-4 h-4 text-red-600" /> PDF
@@ -220,8 +259,7 @@ function ResultTable() {
           </div>
         </div>
       </div>
-<br/><br/><br/>
-      {/* Table */}
+<br/><br/>
       <div className="overflow-x-auto max-h-[70vh]">
         <table className="table-auto w-full border-collapse border border-gray-300 text-sm">
           <thead className="bg-gray-100 sticky top-0 z-10">
@@ -269,7 +307,6 @@ function ResultTable() {
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="flex justify-center mt-4 gap-2">
         <button
           disabled={page === 1}
@@ -287,6 +324,91 @@ function ResultTable() {
           Next
         </button>
       </div>
+
+      {showPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center border-b p-4">
+              <h3 className="text-lg font-bold">
+                {previewType === 'excel' ? 'Excel Preview' : 'PDF Preview'} (First 5 records)
+              </h3>
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              {previewType === 'excel' ? (
+                <div className="overflow-auto">
+                  <table className="min-w-full border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        {previewData[0]?.map((header, i) => (
+                          <th key={i} className="border p-2 text-left">{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.slice(1).map((row, i) => (
+                        <tr key={i}>
+                          {row.map((cell, j) => (
+                            <td key={j} className="border p-2">{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="overflow-auto">
+                  <div className="mb-4 font-bold">Quiz Report - Set {selectedSet}</div>
+                  <table className="min-w-full border text-xs">
+                    <thead>
+                      <tr className="bg-green-100">
+                        {['Name', 'USN', 'College', 'Department', 'Email', 'Total'].map((header, i) => (
+                          <th key={i} className="border p-1 text-left">{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredResults.slice(0, 5).map(({ user }) => (
+                        <tr key={user._id}>
+                          <td className="border p-1">{user.fullname || '-'}</td>
+                          <td className="border p-1">{user.usn || '-'}</td>
+                          <td className="border p-1">{user.collegename || '-'}</td>
+                          <td className="border p-1">{user.branch || '-'}</td>
+                          <td className="border p-1">{user.email || '-'}</td>
+                          <td className="border p-1 font-bold text-green-700">
+                            {marksMap[`${user._id}_${selectedSet}`] ?? '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <button
+                onClick={() => setShowPreview(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={previewType === 'excel' ? handleExportExcel : handleExportPDF}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Download {previewType === 'excel' ? 'Excel' : 'PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
