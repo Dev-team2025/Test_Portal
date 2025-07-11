@@ -3,13 +3,21 @@ import axios from 'axios';
 import moment from 'moment';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { FileDown, School, FileSpreadsheet, LoaderCircle } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import {
+  FileSpreadsheet,
+  LoaderCircle,
+  FileDown,
+  School,
+  FileText,
+  FileType2
+} from 'lucide-react';
 
 function getCurrentWeekSets(totalSets = 52) {
   const now = moment();
   const weekOfYear = now.isoWeek();
   const startSet = ((weekOfYear - 1) * 3) % totalSets + 1;
-
   return [
     startSet,
     startSet % totalSets + 1,
@@ -26,6 +34,8 @@ function ResultTable() {
   const [marksMap, setMarksMap] = useState({});
   const [allColleges, setAllColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState('');
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const sets = getCurrentWeekSets();
@@ -42,7 +52,6 @@ function ResultTable() {
         const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/result/all`);
         const answers = response.data.answers || [];
         const marks = response.data.marksMap || {};
-
         setMarksMap(marks);
 
         const grouped = {};
@@ -51,7 +60,6 @@ function ResultTable() {
         answers.forEach((ans) => {
           const userId = ans.userId?._id;
           const question = ans.questionId;
-
           if (!userId || !question?._id || ans.setNumber !== question.set || ans.setNumber !== selectedSet) return;
 
           const qid = question._id;
@@ -76,20 +84,19 @@ function ResultTable() {
           };
         });
 
-        const sortedQuestions = Array.from(questionMap.values()).sort((a, b) =>
+        setQuestionDetails(Array.from(questionMap.values()).sort((a, b) =>
           a.text.localeCompare(b.text)
-        );
+        ));
 
         const colleges = new Set();
         Object.values(grouped).forEach(({ user }) => {
           if (user.collegename) colleges.add(user.collegename);
         });
-
         setAllColleges(Array.from(colleges).sort());
-        setQuestionDetails(sortedQuestions);
         setGroupedResults(grouped);
-      } catch (error) {
-        console.error('Error fetching results:', error);
+        setPage(1);
+      } catch (err) {
+        console.error('Error fetching results:', err);
       } finally {
         setLoading(false);
       }
@@ -102,36 +109,48 @@ function ResultTable() {
     ? Object.values(groupedResults).filter(({ user }) => user.collegename === selectedCollege)
     : Object.values(groupedResults);
 
-  const handleDownloadExcel = () => {
-    const headers = [
-      'Name', 'USN', 'College', 'Department', 'Email', 'Total Marks',
-      ...questionDetails.map(q => q.text)
-    ];
+  const paginatedResults = filteredResults.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const totalPages = Math.ceil(filteredResults.length / itemsPerPage);
 
+  const handleExportExcel = () => {
+    const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
     const data = filteredResults.map(({ user, answers }) => {
       const row = [
-        user.fullname || '-', user.usn || '-', user.collegename || '-',
-        user.branch || '-', user.email || '-', marksMap[`${user._id}_${selectedSet}`] ?? '-'
+        user.fullname || '-', user.usn || '-', user.collegename || '-', user.branch || '-', user.email || '-',
+        marksMap[`${user._id}_${selectedSet}`] ?? '-'
       ];
-
       questionDetails.forEach((q) => {
         const ans = answers[q._id];
         row.push(ans ? `${ans.selectedOption} (${ans.isCorrect ? 'Correct' : 'Wrong'})` : '-');
       });
-
       return row;
     });
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `Set_${selectedSet}`);
+    const ts = moment().format('YYYY-MM-DD_HH-mm-ss');
+    const filename = `Quiz_Results_Set${selectedSet}_${ts}.xlsx`;
+    const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    saveAs(new Blob([buffer], { type: 'application/octet-stream' }), filename);
+  };
 
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Set_${selectedSet}`);
-
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
-    const filename = `Quiz_Results_Set${selectedSet}_${timestamp}.xlsx`;
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, filename);
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.text(`Quiz Report - Set ${selectedSet}`, 14, 14);
+    const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total'];
+    const body = filteredResults.map(({ user }) => [
+      user.fullname || '-', user.usn || '-', user.collegename || '-', user.branch || '-', user.email || '-',
+      marksMap[`${user._id}_${selectedSet}`] ?? '-'
+    ]);
+    autoTable(doc, {
+      head: [headers],
+      body,
+      startY: 20,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [22, 160, 133] }
+    });
+    const ts = moment().format('YYYY-MM-DD_HH-mm-ss');
+    doc.save(`Quiz_Results_Set${selectedSet}_${ts}.pdf`);
   };
 
   if (loading) {
@@ -151,9 +170,8 @@ function ResultTable() {
 
       <div className="mb-4 flex gap-4 items-center flex-wrap">
         <div className="flex items-center gap-2">
-          <label htmlFor="set-select" className="font-medium">Set:</label>
+          <label className="font-medium">Set:</label>
           <select
-            id="set-select"
             value={selectedSet}
             onChange={(e) => setSelectedSet(Number(e.target.value))}
             className="border border-gray-300 rounded p-2"
@@ -165,11 +183,10 @@ function ResultTable() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label htmlFor="college-select" className="font-medium flex items-center gap-1">
+          <label className="font-medium flex items-center gap-1">
             <School className="w-4 h-4" /> College:
           </label>
           <select
-            id="college-select"
             value={selectedCollege}
             onChange={(e) => setSelectedCollege(e.target.value)}
             className="border border-gray-300 rounded p-2"
@@ -181,32 +198,47 @@ function ResultTable() {
           </select>
         </div>
 
-        <button
-          onClick={handleDownloadExcel}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition flex items-center gap-2"
-        >
-          <FileDown className="w-4 h-4" />
-          Download Excel
-        </button>
+        {/* Download dropdown */}
+        <div className="relative group">
+          <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 transition">
+            <FileDown className="w-4 h-4" />
+            Download
+          </button>
+          <div className="absolute z-10 hidden group-hover:block bg-white border mt-1 rounded shadow-md">
+            <button
+              onClick={handleExportExcel}
+              className="px-4 py-2 text-sm w-full hover:bg-gray-100 flex items-center gap-2"
+            >
+              <FileType2 className="w-4 h-4 text-green-600" /> Excel
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 text-sm w-full hover:bg-gray-100 flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4 text-red-600" /> PDF
+            </button>
+          </div>
+        </div>
       </div>
-
-      <div className="overflow-x-auto">
+<br/><br/><br/>
+      {/* Table */}
+      <div className="overflow-x-auto max-h-[70vh]">
         <table className="table-auto w-full border-collapse border border-gray-300 text-sm">
-          <thead className="bg-gray-100 text-left">
+          <thead className="bg-gray-100 sticky top-0 z-10">
             <tr>
-              <th className="border p-2">Name</th>
-              <th className="border p-2">USN</th>
-              <th className="border p-2">College</th>
-              <th className="border p-2">Department</th>
-              <th className="border p-2">Email</th>
-              <th className="border p-2 text-green-700">Total Marks</th>
+              <th className="border p-2 bg-white">Name</th>
+              <th className="border p-2 bg-white">USN</th>
+              <th className="border p-2 bg-white">College</th>
+              <th className="border p-2 bg-white">Department</th>
+              <th className="border p-2 bg-white">Email</th>
+              <th className="border p-2 text-green-700 bg-white">Total Marks</th>
               {questionDetails.map((q) => (
-                <th key={q._id} className="border p-2 min-w-[200px]">{q.text}</th>
+                <th key={q._id} className="border p-2 bg-white min-w-[200px]">{q.text}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filteredResults.map(({ user, answers }) => (
+            {paginatedResults.map(({ user, answers }) => (
               <tr key={user._id}>
                 <td className="border p-2">{user.fullname || '-'}</td>
                 <td className="border p-2">{user.usn || '-'}</td>
@@ -235,6 +267,25 @@ function ResultTable() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex justify-center mt-4 gap-2">
+        <button
+          disabled={page === 1}
+          onClick={() => setPage((p) => p - 1)}
+          className="px-3 py-1 border rounded disabled:opacity-50"
+        >
+          Prev
+        </button>
+        <span className="px-3 py-1">{page} / {totalPages}</span>
+        <button
+          disabled={page === totalPages}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-3 py-1 border rounded disabled:opacity-50"
+        >
+          Next
+        </button>
       </div>
     </div>
   );
