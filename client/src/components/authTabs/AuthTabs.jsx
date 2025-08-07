@@ -23,42 +23,33 @@ export default function AuthTabs() {
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    // Validate email format
     const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    // Validate USN format (example: 1RV20CS001)
-    const validateUSN = (usn) => /^[1-9][A-Za-z]{2}\d{2}[A-Za-z]{2}\d{3}$/.test(usn);
+    // ✅ Updated: USN format validator for 4SU19CS001 pattern (10 characters)
+    const validateUSN = (usn) => /^[1-9][A-Z]{2}\d{2}[A-Z]{2}\d{3}$/i.test(usn);
 
-    // Validate Year of Passing (between 2000 and current year + 5)
     const validateYOP = (yop) => {
         const currentYear = new Date().getFullYear();
         return yop >= 2000 && yop <= currentYear + 5;
     };
 
-    // Verify token on component mount
     useEffect(() => {
         const verifyToken = async () => {
             const token = localStorage.getItem("token");
-
             const user_type = localStorage.getItem("user_type");
             if (!token) return;
 
             setIsLoading(true);
             try {
-                const response = await axios.get("http://localhost:5000/api/auth/verify-token", {
+                const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/auth/verify-token`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
                 if (response.data.success) {
                     const decoded = jwtDecode(token);
-                    if (decoded.user_type === "admin") {
-                        navigate("/admindashboard");
-                    } else {
-                        navigate("/dashboard");
-                    }
+                    navigate(decoded.user_type === "admin" ? "/admindashboard" : "/dashboard");
                 }
             } catch (err) {
-                console.error("Token verification failed:", err);
                 localStorage.removeItem("token");
                 setError("Your session has expired. Please login again.");
             } finally {
@@ -69,9 +60,14 @@ export default function AuthTabs() {
         verifyToken();
     }, [navigate]);
 
-
+    // ✅ Force uppercase for USN input
     const handleInputChange = (e) => {
-        const { name, value } = e.target;
+        let { name, value } = e.target;
+
+        if (name === "usn") {
+            value = value.toUpperCase();
+        }
+
         setFormData(prev => ({
             ...prev,
             [name]: value
@@ -94,7 +90,7 @@ export default function AuthTabs() {
 
         setIsLoading(true);
         try {
-            const response = await axios.post("http://localhost:5000/api/auth/login", {
+            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/login`, {
                 email: formData.email,
                 password: formData.password
             }, {
@@ -120,12 +116,10 @@ export default function AuthTabs() {
         }
     };
 
-
     const handleSignup = async (e) => {
         e.preventDefault();
         setError("");
 
-        // Validate all fields
         if (!validateEmail(formData.email)) {
             setError("Please enter a valid email address.");
             return;
@@ -137,7 +131,7 @@ export default function AuthTabs() {
         }
 
         if (!validateUSN(formData.usn)) {
-            setError("Please enter a valid USN (e.g., 1RV20CS001).");
+            setError("Please enter a valid USN (e.g., 4SU19CS001).");
             return;
         }
 
@@ -153,7 +147,7 @@ export default function AuthTabs() {
 
         setIsLoading(true);
         try {
-            const response = await axios.post("http://localhost:5000/api/auth/register", {
+            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/register`, {
                 ...formData,
                 yop: parseInt(formData.yop)
             }, {
@@ -163,7 +157,6 @@ export default function AuthTabs() {
             if (response.data.success) {
                 setError("");
                 setActiveTab("login");
-                // Clear form fields
                 setFormData({
                     email: "",
                     password: "",
@@ -197,18 +190,16 @@ export default function AuthTabs() {
             <div className="flex justify-center gap-6 mb-6 p-3 rounded-xl bg-white/10 backdrop-blur-md shadow-md">
                 <button
                     onClick={() => setActiveTab("login")}
-                    className={`px-5 py-2 rounded-lg font-semibold transition duration-300 ${activeTab === "login" ? "bg-red-800 text-white" : "bg-white text-black"
-                        }`}
+                    className={`px-5 py-2 rounded-lg font-semibold transition duration-300 ${activeTab === "login" ? "bg-red-800 text-white" : "bg-white text-black"}`}
                 >
                     Login
                 </button>
-                {/* <button
+                <button
                     onClick={() => setActiveTab("signup")}
-                    className={`px-5 py-2 rounded-lg font-semibold transition duration-300 ${activeTab === "signup" ? "bg-red-800 text-white" : "bg-white text-black"
-                        }`}
+                    className={`px-5 py-2 rounded-lg font-semibold transition duration-300 ${activeTab === "signup" ? "bg-red-800 text-white" : "bg-white text-black"}`}
                 >
                     Sign Up
-                </button> */}
+                </button>
             </div>
 
             {error && (
@@ -273,7 +264,7 @@ export default function AuthTabs() {
                             <input
                                 type="text"
                                 name="usn"
-                                placeholder="USN (e.g., 1RV20CS001)"
+                                placeholder="USN (e.g., 4SU19CS001)"
                                 value={formData.usn}
                                 onChange={handleInputChange}
                                 className="w-full bg-transparent p-2 text-black placeholder-gray-500 focus:outline-none"

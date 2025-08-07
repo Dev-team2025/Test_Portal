@@ -415,6 +415,49 @@ const Quiz = () => {
                             <p className="mt-2 text-sm text-gray-500">
                                 {score >= questions.length * 0.7 ? "Great job!" : "Keep practicing!"}
                             </p>
+                            <div className="mt-8 text-left">
+                                <h3 className="text-xl font-semibold mb-4 text-gray-700">Answer Summary</h3>
+                                <div className="overflow-auto">
+                                    <table className="min-w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                                        <thead className="bg-gray-100 text-gray-700">
+                                            <tr>
+                                                <th className="p-3 border">#</th>
+                                                <th className="p-3 border">Question</th>
+                                                <th className="p-3 border">Your Answer</th>
+                                                <th className="p-3 border">Correct Answer</th>
+                                                <th className="p-3 border">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {questions.map((q, idx) => {
+                                                const userAnswer = answers[q._id];
+                                                const correctAnswer = q.correctOption;
+                                                const isCorrect = q.isCorrect;
+
+                                                return (
+                                                    <tr key={q._id} className="border-t hover:bg-gray-50">
+                                                        <td className="p-3 border">{idx + 1}</td>
+                                                        <td className="p-3 border">{q.question}</td>
+                                                        <td className="p-3 border">
+                                                            {userAnswer ? `${userAnswer}. ${q.options[userAnswer.toLowerCase()]}` : "Not Answered"}
+                                                        </td>
+                                                        <td className="p-3 border">
+                                                            {correctAnswer
+                                                                ? `${correctAnswer}. ${q.options[correctAnswer.toLowerCase()] || 'Option text missing'}`
+                                                                : "N/A"}
+                                                        </td>
+                                                        <td className={`p-3 border font-semibold ${isCorrect ? "text-green-600" : "text-red-600"}`}>
+                                                            {isCorrect ? "Correct" : "Wrong"}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+
+                                    </table>
+                                </div>
+                            </div>
+
                         </div>
                         <div className="flex flex-wrap justify-center gap-4">
                             <button

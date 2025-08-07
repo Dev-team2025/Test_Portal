@@ -5,7 +5,7 @@ const Analyse = ({ userId }) => {
     const [analysisData, setAnalysisData] = useState([]);
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/api/quiz/analyse?user_id=${userId}&topic=General`)
+        axios.get(`${import.meta.env.VITE_API_BASE_URL}/quiz/analyse?user_id=${userId}&topic=General`)
             .then(res => setAnalysisData(res.data))
             .catch(err => console.error("❌ Error fetching analysis:", err.response ? err.response.data : err));
     }, [userId]);
