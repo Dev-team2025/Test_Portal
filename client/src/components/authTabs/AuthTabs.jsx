@@ -25,7 +25,7 @@ export default function AuthTabs() {
 
     const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-    // ✅ Updated: USN format validator for 4SU19CS001 pattern (10 characters)
+    //  Updated: USN format validator for 4SU19CS001 pattern (10 characters)
     const validateUSN = (usn) => /^[1-9][A-Z]{2}\d{2}[A-Z]{2}\d{3}$/i.test(usn);
 
     const validateYOP = (yop) => {
@@ -60,7 +60,7 @@ export default function AuthTabs() {
         verifyToken();
     }, [navigate]);
 
-    // ✅ Force uppercase for USN input
+    //  Force uppercase for USN input
     const handleInputChange = (e) => {
         let { name, value } = e.target;
 
