@@ -1,5 +1,5 @@
 const Question = require("../models/Questions");
-const getCurrentWeekSets = require("../utils/WeekUtils").getCurrentWeekSets;
+const getCurrentWeekSets = require("../utils/weekUtils").getCurrentWeekSets;
 
 exports.getWeeklyQuestions = async (req, res) => {
     const card = req.query.card;
