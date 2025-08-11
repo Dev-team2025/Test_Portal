@@ -8,7 +8,13 @@ const connectDB = require("./config/db");
 
 // Initialize Express app
 const app = express();
-
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-quiz-start-time'],
+    credentials: true
+}));
+app.use(bodyParser.json());
 // Database connection
 connectDB();
 
