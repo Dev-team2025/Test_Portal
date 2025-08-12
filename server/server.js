@@ -13,7 +13,7 @@ connectDB();
 
 // Allowed origins
 const allowedOrigins = [
-    "http://localhost:5173"
+    "test-portal-lake.vercel.app"
 ];
 
 // ✅ Dynamic CORS Middleware
