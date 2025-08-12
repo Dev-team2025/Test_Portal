@@ -13,7 +13,7 @@ connectDB();
 
 // Allowed origins
 const allowedOrigins = [
-    "test-portal-lake.vercel.app"
+    "https://test-portal-srbl.onrender.com"
 ];
 
 // ✅ Dynamic CORS Middleware
