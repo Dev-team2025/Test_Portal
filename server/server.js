@@ -13,7 +13,7 @@ connectDB();
 
 // Allowed origins
 const allowedOrigins = [
-    "https://test-portal-git-main-dev-team2025s-projects.vercel.app/"
+    "http://localhost:5173"
 ];
 
 // ✅ Dynamic CORS Middleware
