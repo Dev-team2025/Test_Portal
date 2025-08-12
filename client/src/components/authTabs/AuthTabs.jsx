@@ -194,12 +194,12 @@ export default function AuthTabs() {
                 >
                     Login
                 </button>
-                <button
+                {/* <button
                     onClick={() => setActiveTab("signup")}
                     className={`px-5 py-2 rounded-lg font-semibold transition duration-300 ${activeTab === "signup" ? "bg-red-800 text-white" : "bg-white text-black"}`}
                 >
                     Sign Up
-                </button>
+                </button> */}
             </div>
 
             {error && (
