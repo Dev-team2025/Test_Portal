@@ -1,5 +1,5 @@
 // server.js
-require("dotenv").config();
+require('dotenv').config({ quiet: true });
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -13,7 +13,7 @@ connectDB();
 
 // Allowed origins
 const allowedOrigins = [
-    "https://test-portal-lake.vercel.app"
+    "http://localhost:5173"
 ];
 
 // ✅ Dynamic CORS Middleware
