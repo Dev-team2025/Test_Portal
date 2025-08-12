@@ -13,26 +13,26 @@ connectDB();
 
 // CORS configuration
 const allowedOrigins = [
-    process.env.FRONTEND_URL || "http://localhost:5173",
-    "https://test-portal-lake.vercel.app" // Vercel frontend URL
+    "http://localhost:5173",
+    "https://test-portal-lake.vercel.app"
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
+        // Allow requests with no origin (like Postman or curl)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
-        } else {
-            return callback(new Error("Not allowed by CORS"));
         }
+        console.warn(`Blocked by CORS: ${origin}`);
+        return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-quiz-start-time"]
 }));
 
-// Parse request bodies
+// Middleware
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 app.use(morgan("dev"));
