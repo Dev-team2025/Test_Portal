@@ -8,6 +8,8 @@ function EditUserDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
 
+    const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
     const [formData, setFormData] = useState({
         username: '',
         fullname: '',
@@ -22,7 +24,7 @@ function EditUserDetails() {
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/api/auth/users/${id}`, {
+        axios.get(`${API_BASE}/auth/users/${id}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         })
             .then((res) => {
@@ -37,7 +39,7 @@ function EditUserDetails() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [id]);
+    }, [id, API_BASE]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -47,7 +49,7 @@ function EditUserDetails() {
         e.preventDefault();
         setUpdating(true);
 
-        axios.put(`http://localhost:5000/api/auth/users/${id}`, formData, {
+        axios.put(`${API_BASE}/auth/users/${id}`, formData, {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         })
             .then((res) => {

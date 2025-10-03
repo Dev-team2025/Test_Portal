@@ -12,12 +12,16 @@ function QuestionsManagement() {
         option_c: "",
         option_d: "",
         correctOption: "",
-        explanation: ""
+        explanation: "",
+        type: "technical",
+        difficulty: "easy"
     });
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // ✅ use .env variable
 
     const fetchQuestions = async () => {
         try {
-            const res = await axios.get("http://localhost:5000/api/questions");
+            const res = await axios.get(`${API_BASE_URL}/questions`);
             setQuestions(res.data);
         } catch (error) {
             console.error("Failed to load questions", error);
@@ -50,12 +54,10 @@ function QuestionsManagement() {
 
         try {
             const response = await axios.post(
-                "http://localhost:5000/api/questions/upload-excel",
+                `${API_BASE_URL}/questions/upload-excel`,
                 formData,
                 {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
+                    headers: { "Content-Type": "multipart/form-data" }
                 }
             );
             Swal.fire("Success", response.data.message, "success");
@@ -63,7 +65,8 @@ function QuestionsManagement() {
             setFile(null);
         } catch (err) {
             console.error("Upload Error:", err);
-            const errorMsg = err.response?.data?.details ||
+            const errorMsg =
+                err.response?.data?.details ||
                 err.response?.data?.error ||
                 "Failed to upload questions";
             Swal.fire("Error", errorMsg, "error");
@@ -73,7 +76,6 @@ function QuestionsManagement() {
     const handleAdd = async (e) => {
         e.preventDefault();
 
-        // Trim all input fields before sending
         const trimmedData = {
             set: formData.set.trim(),
             question: formData.question.trim(),
@@ -82,11 +84,13 @@ function QuestionsManagement() {
             option_c: formData.option_c.trim(),
             option_d: formData.option_d.trim(),
             correctOption: formData.correctOption.trim(),
-            explanation: formData.explanation.trim()
+            explanation: formData.explanation.trim(),
+            type: formData.type,
+            difficulty: formData.difficulty
         };
 
         try {
-            await axios.post("http://localhost:5000/api/questions", trimmedData);
+            await axios.post(`${API_BASE_URL}/questions`, trimmedData);
             Swal.fire("Success", "Question added successfully!", "success");
             setFormData({
                 set: "",
@@ -96,7 +100,9 @@ function QuestionsManagement() {
                 option_c: "",
                 option_d: "",
                 correctOption: "",
-                explanation: ""
+                explanation: "",
+                type: "technical",
+                difficulty: "easy"
             });
             fetchQuestions();
         } catch (error) {
@@ -107,7 +113,7 @@ function QuestionsManagement() {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:5000/api/questions/${id}`);
+            await axios.delete(`${API_BASE_URL}/questions/${id}`);
             Swal.fire("Deleted", "Question removed!", "success");
             fetchQuestions();
         } catch (error) {
@@ -127,8 +133,7 @@ function QuestionsManagement() {
                 />
                 <button
                     onClick={handleExcelUpload}
-                    style={{ backgroundColor: "var(--color-red-800)" }}
-                    className="text-white px-4 py-2 rounded hover:opacity-90"
+                    className="bg-red-800 text-white px-4 py-2 rounded hover:bg-red-700"
                 >
                     Upload Excel
                 </button>
@@ -150,18 +155,21 @@ function QuestionsManagement() {
                     required
                 />
 
-                {["question", "option_a", "option_b", "option_c", "option_d", "correctOption", "explanation"].map((field) => (
-                    <input
-                        key={field}
-                        type="text"
-                        name={field}
-                        placeholder={field.replace(/([A-Z])/g, " $1").toUpperCase()}
-                        value={formData[field]}
-                        onChange={handleChange}
-                        className="p-2 border border-gray-300 rounded"
-                        required
-                    />
-                ))}
+                {["question", "option_a", "option_b", "option_c", "option_d", "correctOption", "explanation"].map(
+                    (field) => (
+                        <input
+                            key={field}
+                            type="text"
+                            name={field}
+                            placeholder={field.replace(/([A-Z])/g, " $1").toUpperCase()}
+                            value={formData[field]}
+                            onChange={handleChange}
+                            className="p-2 border border-gray-300 rounded"
+                            required
+                        />
+                    )
+                )}
+
                 <select
                     name="type"
                     value={formData.type}
@@ -184,6 +192,7 @@ function QuestionsManagement() {
                     <option value="medium">Medium</option>
                     <option value="hard">Hard</option>
                 </select>
+
                 <button
                     type="submit"
                     className="col-span-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
@@ -199,12 +208,14 @@ function QuestionsManagement() {
                         className="p-4 bg-gray-100 rounded-lg shadow flex justify-between items-center"
                     >
                         <div>
-                            <p className="font-semibold">{i + 1}. [{q.set}] {q.question}</p>
+                            <p className="font-semibold">
+                                {i + 1}. [{q.set}] {q.question}
+                            </p>
                             <ul className="ml-4 text-sm">
-                                <li>A. {q.options.a}</li>
-                                <li>B. {q.options.b}</li>
-                                <li>C. {q.options.c}</li>
-                                <li>D. {q.options.d}</li>
+                                <li>A. {q.options?.a}</li>
+                                <li>B. {q.options?.b}</li>
+                                <li>C. {q.options?.c}</li>
+                                <li>D. {q.options?.d}</li>
                                 <li>Correct: {q.correctOption}</li>
                                 <li className="text-gray-500">Explanation: {q.explanation}</li>
                             </ul>

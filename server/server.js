@@ -13,7 +13,7 @@ connectDB();
 
 // Allowed origins
 const allowedOrigins = [
-    "http://localhost:3010"
+    "http://localhost:5173"
 ];
 
 // ✅ Dynamic CORS Middleware

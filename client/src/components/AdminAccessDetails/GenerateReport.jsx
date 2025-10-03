@@ -120,10 +120,10 @@ function ResultTable() {
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
     const data = filteredResults.slice(0, 5).map(({ user, answers }) => {
       const row = [
-        user.fullname || '-', 
-        user.usn || '-', 
-        user.collegename || '-', 
-        user.branch || '-', 
+        user.fullname || '-',
+        user.usn || '-',
+        user.collegename || '-',
+        user.branch || '-',
         user.email || '-',
         marksMap[`${user._id}_${selectedSet}`] ?? '-'
       ];
@@ -133,7 +133,7 @@ function ResultTable() {
       });
       return row;
     });
-    
+
     setPreviewData([headers, ...data]);
     setPreviewType(type);
     setShowPreview(true);
@@ -143,10 +143,10 @@ function ResultTable() {
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
     const data = filteredResults.map(({ user, answers }) => {
       const row = [
-        user.fullname || '-', 
-        user.usn || '-', 
-        user.collegename || '-', 
-        user.branch || '-', 
+        user.fullname || '-',
+        user.usn || '-',
+        user.collegename || '-',
+        user.branch || '-',
         user.email || '-',
         marksMap[`${user._id}_${selectedSet}`] ?? '-'
       ];
@@ -156,7 +156,7 @@ function ResultTable() {
       });
       return row;
     });
-    
+
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `Set_${selectedSet}`);
@@ -172,14 +172,14 @@ function ResultTable() {
     doc.text(`Quiz Report - Set ${selectedSet}`, 14, 14);
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total'];
     const body = filteredResults.map(({ user }) => [
-      user.fullname || '-', 
-      user.usn || '-', 
-      user.collegename || '-', 
-      user.branch || '-', 
+      user.fullname || '-',
+      user.usn || '-',
+      user.collegename || '-',
+      user.branch || '-',
       user.email || '-',
       marksMap[`${user._id}_${selectedSet}`] ?? '-'
     ]);
-    
+
     autoTable(doc, {
       head: [headers],
       body,
@@ -187,7 +187,7 @@ function ResultTable() {
       styles: { fontSize: 7 },
       headStyles: { fillColor: [22, 160, 133] }
     });
-    
+
     const ts = moment().format('YYYY-MM-DD_HH-mm-ss');
     doc.save(`Quiz_Results_Set${selectedSet}_${ts}.pdf`);
     setShowPreview(false);
@@ -259,7 +259,7 @@ function ResultTable() {
           </div>
         </div>
       </div>
-<br/><br/>
+      <br /><br />
       <div className="overflow-x-auto max-h-[70vh]">
         <table className="table-auto w-full border-collapse border border-gray-300 text-sm">
           <thead className="bg-gray-100 sticky top-0 z-10">
@@ -332,14 +332,14 @@ function ResultTable() {
               <h3 className="text-lg font-bold">
                 {previewType === 'excel' ? 'Excel Preview' : 'PDF Preview'} (First 5 records)
               </h3>
-              <button 
+              <button
                 onClick={() => setShowPreview(false)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             <div className="p-4">
               {previewType === 'excel' ? (
                 <div className="overflow-auto">
@@ -391,7 +391,7 @@ function ResultTable() {
                 </div>
               )}
             </div>
-            
+
             <div className="flex justify-end gap-2 p-4 border-t">
               <button
                 onClick={() => setShowPreview(false)}
