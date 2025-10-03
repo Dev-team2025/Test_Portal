@@ -582,7 +582,7 @@ const Quiz = () => {
                                     })}
                                 </div>
 
-                                {(currentQuestion.explanation && (submitted || answers[currentQuestion._id])) && (
+                                {/* {(currentQuestion.explanation && (submitted || answers[currentQuestion._id])) && (
                                     <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                                         <div className="flex items-center gap-2 text-blue-700 mb-2">
                                             <Info className="h-4 w-4" />
@@ -592,7 +592,7 @@ const Quiz = () => {
                                             {currentQuestion.explanation}
                                         </p>
                                     </div>
-                                )}
+                                )} */}
                             </div>
                         </div>
 
