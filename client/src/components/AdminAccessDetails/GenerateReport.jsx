@@ -15,44 +15,55 @@ import {
   X
 } from 'lucide-react';
 
+// Calculate current week sets based on October start
 function getCurrentWeekSets(totalSets = 52) {
   const now = moment();
-  const weekOfYear = now.isoWeek();
+  const startOfYear =
+    now.month() >= 9
+      ? moment([now.year(), 9, 1]) // Oct this year
+      : moment([now.year() - 1, 9, 1]); // Oct last year
+
+  const weekOfYear = Math.floor(now.diff(startOfYear, "weeks")) + 1;
+
   const startSet = ((weekOfYear - 1) * 3) % totalSets + 1;
+
   return [
     startSet,
-    startSet % totalSets + 1,
-    (startSet + 1) % totalSets + 1
+    (startSet % totalSets) + 1,
+    ((startSet + 1) % totalSets) + 1
   ].map(set => (set > totalSets ? set - totalSets : set));
 }
 
 function ResultTable() {
+  const [currentWeekSets, setCurrentWeekSets] = useState([]);
+  const [selectedSet, setSelectedSet] = useState(null);
   const [groupedResults, setGroupedResults] = useState({});
   const [questionDetails, setQuestionDetails] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSet, setSelectedSet] = useState(null);
-  const [currentWeekSets, setCurrentWeekSets] = useState([]);
   const [marksMap, setMarksMap] = useState({});
   const [allColleges, setAllColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState('');
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [previewType, setPreviewType] = useState(null);
   const [previewData, setPreviewData] = useState([]);
   const itemsPerPage = 10;
 
+  // Initialize week sets
   useEffect(() => {
     const sets = getCurrentWeekSets();
     setCurrentWeekSets(sets);
     setSelectedSet(sets[0]);
   }, []);
 
+  // Fetch results for selected set
   useEffect(() => {
     if (!selectedSet) return;
 
     const fetchResults = async () => {
       try {
         setLoading(true);
+        // Fetch all answers for the selected set
         const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/result/all`);
         const answers = response.data.answers || [];
         const marks = response.data.marksMap || {};
@@ -61,33 +72,36 @@ function ResultTable() {
         const grouped = {};
         const questionMap = new Map();
 
-        answers.forEach((ans) => {
-          const userId = ans.userId?._id;
+        answers.forEach(ans => {
+          const user = ans.userId;
           const question = ans.questionId;
-          if (!userId || !question?._id || ans.setNumber !== question.set || ans.setNumber !== selectedSet) return;
+
+          if (!user || !question || ans.setNumber !== selectedSet) return;
 
           const qid = question._id;
+
           if (!questionMap.has(qid)) {
             questionMap.set(qid, {
               _id: qid,
               text: question.question,
-              order: question.set
+              set: question.set
             });
           }
 
-          if (!grouped[userId]) {
-            grouped[userId] = {
-              user: ans.userId,
+          if (!grouped[user._id]) {
+            grouped[user._id] = {
+              user,
               answers: {}
             };
           }
 
-          grouped[userId].answers[qid] = {
+          grouped[user._id].answers[qid] = {
             selectedOption: ans.selectedOption?.toUpperCase() || '-',
             isCorrect: ans.isCorrect
           };
         });
 
+        setGroupedResults(grouped);
         setQuestionDetails(Array.from(questionMap.values()).sort((a, b) =>
           a.text.localeCompare(b.text)
         ));
@@ -97,10 +111,9 @@ function ResultTable() {
           if (user.collegename) colleges.add(user.collegename);
         });
         setAllColleges(Array.from(colleges).sort());
-        setGroupedResults(grouped);
         setPage(1);
       } catch (err) {
-        console.error('Error fetching results:', err);
+        console.error("Error fetching results:", err);
       } finally {
         setLoading(false);
       }
@@ -120,20 +133,19 @@ function ResultTable() {
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
     const data = filteredResults.slice(0, 5).map(({ user, answers }) => {
       const row = [
-        user.fullname || '-', 
-        user.usn || '-', 
-        user.collegename || '-', 
-        user.branch || '-', 
+        user.fullname || '-',
+        user.usn || '-',
+        user.collegename || '-',
+        user.branch || '-',
         user.email || '-',
         marksMap[`${user._id}_${selectedSet}`] ?? '-'
       ];
-      questionDetails.forEach((q) => {
+      questionDetails.forEach(q => {
         const ans = answers[q._id];
         row.push(ans ? `${ans.selectedOption} (${ans.isCorrect ? 'Correct' : 'Wrong'})` : '-');
       });
       return row;
     });
-    
     setPreviewData([headers, ...data]);
     setPreviewType(type);
     setShowPreview(true);
@@ -143,20 +155,20 @@ function ResultTable() {
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total Marks', ...questionDetails.map(q => q.text)];
     const data = filteredResults.map(({ user, answers }) => {
       const row = [
-        user.fullname || '-', 
-        user.usn || '-', 
-        user.collegename || '-', 
-        user.branch || '-', 
+        user.fullname || '-',
+        user.usn || '-',
+        user.collegename || '-',
+        user.branch || '-',
         user.email || '-',
         marksMap[`${user._id}_${selectedSet}`] ?? '-'
       ];
-      questionDetails.forEach((q) => {
+      questionDetails.forEach(q => {
         const ans = answers[q._id];
         row.push(ans ? `${ans.selectedOption} (${ans.isCorrect ? 'Correct' : 'Wrong'})` : '-');
       });
       return row;
     });
-    
+
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `Set_${selectedSet}`);
@@ -172,14 +184,14 @@ function ResultTable() {
     doc.text(`Quiz Report - Set ${selectedSet}`, 14, 14);
     const headers = ['Name', 'USN', 'College', 'Department', 'Email', 'Total'];
     const body = filteredResults.map(({ user }) => [
-      user.fullname || '-', 
-      user.usn || '-', 
-      user.collegename || '-', 
-      user.branch || '-', 
+      user.fullname || '-',
+      user.usn || '-',
+      user.collegename || '-',
+      user.branch || '-',
       user.email || '-',
       marksMap[`${user._id}_${selectedSet}`] ?? '-'
     ]);
-    
+
     autoTable(doc, {
       head: [headers],
       body,
@@ -187,7 +199,7 @@ function ResultTable() {
       styles: { fontSize: 7 },
       headStyles: { fillColor: [22, 160, 133] }
     });
-    
+
     const ts = moment().format('YYYY-MM-DD_HH-mm-ss');
     doc.save(`Quiz_Results_Set${selectedSet}_${ts}.pdf`);
     setShowPreview(false);
@@ -240,8 +252,7 @@ function ResultTable() {
 
         <div className="relative group">
           <button className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 transition">
-            <FileDown className="w-4 h-4" />
-            Download
+            <FileDown className="w-4 h-4" /> Download
           </button>
           <div className="absolute z-10 hidden group-hover:block bg-white border mt-1 rounded shadow-md">
             <button
@@ -259,7 +270,7 @@ function ResultTable() {
           </div>
         </div>
       </div>
-<br/><br/>
+
       <div className="overflow-x-auto max-h-[70vh]">
         <table className="table-auto w-full border-collapse border border-gray-300 text-sm">
           <thead className="bg-gray-100 sticky top-0 z-10">
@@ -293,9 +304,7 @@ function ResultTable() {
                       {ans ? (
                         <div>
                           <div className="font-semibold">{ans.selectedOption}</div>
-                          <div className="text-xs text-gray-500">
-                            {ans.isCorrect ? '✅' : '❌'}
-                          </div>
+                          <div className="text-xs text-gray-500">{ans.isCorrect ? '✅' : '❌'}</div>
                         </div>
                       ) : '-'}
                     </td>
@@ -308,21 +317,9 @@ function ResultTable() {
       </div>
 
       <div className="flex justify-center mt-4 gap-2">
-        <button
-          disabled={page === 1}
-          onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Prev
-        </button>
+        <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
         <span className="px-3 py-1">{page} / {totalPages}</span>
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >
-          Next
-        </button>
+        <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
       </div>
 
       {showPreview && (
@@ -332,31 +329,24 @@ function ResultTable() {
               <h3 className="text-lg font-bold">
                 {previewType === 'excel' ? 'Excel Preview' : 'PDF Preview'} (First 5 records)
               </h3>
-              <button 
-                onClick={() => setShowPreview(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
+              <button onClick={() => setShowPreview(false)} className="text-gray-500 hover:text-gray-700">
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             <div className="p-4">
               {previewType === 'excel' ? (
                 <div className="overflow-auto">
                   <table className="min-w-full border">
                     <thead>
                       <tr className="bg-gray-100">
-                        {previewData[0]?.map((header, i) => (
-                          <th key={i} className="border p-2 text-left">{header}</th>
-                        ))}
+                        {previewData[0]?.map((header, i) => <th key={i} className="border p-2 text-left">{header}</th>)}
                       </tr>
                     </thead>
                     <tbody>
                       {previewData.slice(1).map((row, i) => (
                         <tr key={i}>
-                          {row.map((cell, j) => (
-                            <td key={j} className="border p-2">{cell}</td>
-                          ))}
+                          {row.map((cell, j) => <td key={j} className="border p-2">{cell}</td>)}
                         </tr>
                       ))}
                     </tbody>
@@ -381,9 +371,7 @@ function ResultTable() {
                           <td className="border p-1">{user.collegename || '-'}</td>
                           <td className="border p-1">{user.branch || '-'}</td>
                           <td className="border p-1">{user.email || '-'}</td>
-                          <td className="border p-1 font-bold text-green-700">
-                            {marksMap[`${user._id}_${selectedSet}`] ?? '-'}
-                          </td>
+                          <td className="border p-1 font-bold text-green-700">{marksMap[`${user._id}_${selectedSet}`] ?? '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -391,18 +379,10 @@ function ResultTable() {
                 </div>
               )}
             </div>
-            
+
             <div className="flex justify-end gap-2 p-4 border-t">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="px-4 py-2 border rounded hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={previewType === 'excel' ? handleExportExcel : handleExportPDF}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
+              <button onClick={() => setShowPreview(false)} className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
+              <button onClick={previewType === 'excel' ? handleExportExcel : handleExportPDF} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
                 Download {previewType === 'excel' ? 'Excel' : 'PDF'}
               </button>
             </div>
