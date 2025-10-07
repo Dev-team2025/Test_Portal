@@ -271,7 +271,7 @@ function ResultTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto max-h-[70vh]">
+      <div className="overflow-x-auto max-h-[70vh] mt-20">
         <table className="table-auto w-full border-collapse border border-gray-300 text-sm">
           <thead className="bg-gray-100 sticky top-0 z-10">
             <tr>
