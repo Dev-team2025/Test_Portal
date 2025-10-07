@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
+const path = require("path");
 const connectDB = require("./config/db");
 
 const app = express();
@@ -65,17 +66,14 @@ app.get("/api/health", (req, res) => {
     });
 });
 
-app.get("/", (req, res) => {
-    res.send("Backend is running");
-});
+// Serve static files from the React app in production
+const clientBuildPath = path.join(__dirname, "../client/dist");
+app.use(express.static(clientBuildPath));
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: "Endpoint not found",
-        requestedUrl: req.originalUrl
-    });
+// Handle React routing - send all non-API requests to index.html
+// Express 5 requires regex pattern instead of "*"
+app.get(/^\/(?!api).*/, (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
 // Error handler

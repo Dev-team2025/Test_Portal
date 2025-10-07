@@ -5,7 +5,10 @@ const Analyse = ({ userId }) => {
     const [analysisData, setAnalysisData] = useState([]);
 
     useEffect(() => {
-        axios.get(`${import.meta.env.VITE_API_BASE_URL}/quiz/analyse?user_id=${userId}&topic=General`)
+        // Note: /api/quiz/analyse endpoint doesn't exist in backend
+        // This component needs backend implementation or should be removed
+        // Consider using /api/result or /api/answers endpoints instead
+        axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/quiz/analyse?user_id=${userId}&topic=General`)
             .then(res => setAnalysisData(res.data))
             .catch(err => console.error("❌ Error fetching analysis:", err.response ? err.response.data : err));
     }, [userId]);

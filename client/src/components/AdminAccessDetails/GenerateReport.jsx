@@ -53,7 +53,7 @@ function ResultTable() {
     const fetchResults = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/result/all`);
+        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/result/all`);
         const answers = response.data.answers || [];
         const marks = response.data.marksMap || {};
         setMarksMap(marks);

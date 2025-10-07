@@ -41,7 +41,7 @@ export default function AuthTabs() {
 
             setIsLoading(true);
             try {
-                const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/auth/verify-token`, {
+                const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/auth/verify-token`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -90,7 +90,7 @@ export default function AuthTabs() {
 
         setIsLoading(true);
         try {
-            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/login`, {
+            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/login`, {
                 email: formData.email,
                 password: formData.password
             }, {
@@ -147,7 +147,7 @@ export default function AuthTabs() {
 
         setIsLoading(true);
         try {
-            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/register`, {
+            const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/auth/register`, {
                 ...formData,
                 yop: parseInt(formData.yop)
             }, {

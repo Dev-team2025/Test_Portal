@@ -10,7 +10,7 @@ import { jwtDecode } from "jwt-decode";
 import AlertMessage from '../AlertMessage/AlertMessage';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL ,
+    baseURL: `${import.meta.env.VITE_API_BASE_URL}/api`,
     withCredentials: true,
     timeout: 10000,
 });

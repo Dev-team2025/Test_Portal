@@ -6,7 +6,9 @@ export default function ScoreAnalysis() {
     const [scoreData, setScoreData] = useState([]);
 
     useEffect(() => {
-        axios.get("/api/scores")
+        // Note: /api/scores endpoint doesn't exist in backend
+        // This component needs backend implementation or should be removed
+        axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/scores`)
             .then(response => setScoreData(response.data))
             .catch(error => console.error("Error fetching scores:", error));
     }, []);
