@@ -21,7 +21,7 @@ function QuestionsManagement() {
 
     const fetchQuestions = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/questions`);
+            const res = await axios.get(`${API_BASE_URL}/api/questions`);
             setQuestions(res.data);
         } catch (error) {
             console.error("Failed to load questions", error);
@@ -54,7 +54,7 @@ function QuestionsManagement() {
 
         try {
             const response = await axios.post(
-                `${API_BASE_URL}/questions/upload-excel`,
+                `${API_BASE_URL}/api/questions/upload-excel`,
                 formData,
                 {
                     headers: { "Content-Type": "multipart/form-data" }
@@ -90,7 +90,7 @@ function QuestionsManagement() {
         };
 
         try {
-            await axios.post(`${API_BASE_URL}/questions`, trimmedData);
+            await axios.post(`${API_BASE_URL}/api/questions`, trimmedData);
             Swal.fire("Success", "Question added successfully!", "success");
             setFormData({
                 set: "",
@@ -113,7 +113,7 @@ function QuestionsManagement() {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`${API_BASE_URL}/questions/${id}`);
+            await axios.delete(`${API_BASE_URL}/api/questions/${id}`);
             Swal.fire("Deleted", "Question removed!", "success");
             fetchQuestions();
         } catch (error) {

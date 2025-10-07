@@ -24,7 +24,7 @@ function EditUserDetails() {
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
-        axios.get(`${API_BASE}/auth/users/${id}`, {
+        axios.get(`${API_BASE}/api/auth/users/${id}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         })
             .then((res) => {
@@ -49,7 +49,7 @@ function EditUserDetails() {
         e.preventDefault();
         setUpdating(true);
 
-        axios.put(`${API_BASE}/auth/users/${id}`, formData, {
+        axios.put(`${API_BASE}/api/auth/users/${id}`, formData, {
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
         })
             .then((res) => {

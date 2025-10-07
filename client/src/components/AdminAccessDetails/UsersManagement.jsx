@@ -20,7 +20,7 @@ function UsersManagement() {
         const fetchUsers = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get(`${API_BASE_URL}/auth/users`, {
+                const response = await axios.get(`${API_BASE_URL}/api/auth/users`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
 
@@ -59,7 +59,7 @@ function UsersManagement() {
 
         try {
             setActionLoading(true);
-            await axios.delete(`${API_BASE_URL}/auth/users/${id}`, {
+            await axios.delete(`${API_BASE_URL}/api/auth/users/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.filter((user) => user._id !== id));
@@ -124,7 +124,7 @@ function UsersManagement() {
 
                 setActionLoading(true);
                 const response = await axios.post(
-                    `${API_BASE_URL}/auth/users/bulk`,
+                    `${API_BASE_URL}/api/auth/users/bulk`,
                     { users: usersFromExcel },
                     {
                         headers: {
@@ -141,7 +141,7 @@ function UsersManagement() {
                         icon: "success",
                     });
 
-                    const refreshResponse = await axios.get(`${API_BASE_URL}/auth/users`, {
+                    const refreshResponse = await axios.get(`${API_BASE_URL}/api/auth/users`, {
                         headers: { Authorization: `Bearer ${token}` },
                     });
                     setUsers(refreshResponse.data.users);

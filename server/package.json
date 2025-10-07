@@ -1,4 +1,11 @@
 {
+  "name": "server",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "cd ../client && npm install && npm run build"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
