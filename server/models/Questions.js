@@ -76,6 +76,20 @@ const questionSchema = new mongoose.Schema({
     updatedAt: {
         type: Date,
         default: Date.now
+    },
+    // Track when this question was last used
+    lastUsedInWeek: {
+        type: Number,
+        default: null
+    },
+    lastUsedInYear: {
+        type: Number,
+        default: null
+    },
+    // Track how many times this question has been used
+    usageCount: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true,

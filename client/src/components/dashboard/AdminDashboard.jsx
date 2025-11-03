@@ -2,6 +2,7 @@ import React from "react";
 import userIcon from "../images/users.png";
 import reportIcon from "../images/report.png";
 import settingsIcon from "../images/top.png";
+import quizImage from "../images/quiz.png";
 
 export default function AdminDashboard() {
     const cards = [
@@ -21,7 +22,13 @@ export default function AdminDashboard() {
             title: "Questions Management",
             description: "Add, edit, or upload questions and manage quiz settings.",
             image: settingsIcon,
-            link: "/admin/settings" // Keep this as is
+            link: "/admin/settings"
+        },
+        {
+            title: "Card Management",
+            description: "Generate and manage weekly quiz cards with unique questions.",
+            image: quizImage,
+            link: "/admin/cards"
         }
     ];
 

@@ -6,17 +6,30 @@ const Question = require("../models/Questions");
 const {
     getAllQuestions,
     addQuestion,
+    updateQuestion,
     deleteQuestion,
     getWeeklyQuestions,
+    getActiveCardInfo,
+    generateCards,
+    getQuestionStats
 } = require("../controllers/quizController");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+// Question CRUD routes
 router.get("/", getAllQuestions);
 router.post("/", addQuestion);
+router.put("/:id", updateQuestion);
 router.delete("/:id", deleteQuestion);
+
+// Weekly card routes
 router.get("/weekly-questions", getWeeklyQuestions);
+router.get("/active-card-info", getActiveCardInfo);
+
+// Admin routes
+router.post("/generate-cards", generateCards);
+router.get("/stats", getQuestionStats);
 
 // ✅ Excel upload
 router.post("/upload-excel", upload.single("file"), async (req, res) => {

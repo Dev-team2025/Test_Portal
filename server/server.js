@@ -6,11 +6,15 @@ const bodyParser = require("body-parser");
 const morgan = require("morgan");
 const path = require("path");
 const connectDB = require("./config/db");
+const SchedulerService = require("./services/schedulerService");
 
 const app = express();
 
 // Database connection
 connectDB();
+
+// Initialize scheduler service
+new SchedulerService();
 
 // Allowed origins
 const allowedOrigins = [

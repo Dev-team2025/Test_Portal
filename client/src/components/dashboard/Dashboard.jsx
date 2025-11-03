@@ -1,12 +1,39 @@
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import quizImage from "../images/quiz.png";
 import mondayImage from "../images/monday.jpg";
 import wednesdayImage from "../images/wend.png";
 import fridayImage from "../images/friday.png";
 import { FiCalendar, FiClock, FiLock, FiZap, FiActivity, FiBarChart2 } from "react-icons/fi";
 
+const api = axios.create({
+    baseURL: `${import.meta.env.VITE_API_BASE_URL}/api`,
+    withCredentials: true,
+    timeout: 10000,
+});
+
 export default function Dashboard() {
     const navigate = useNavigate();
+    const [cardInfo, setCardInfo] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch active card info on component mount
+    useEffect(() => {
+        const fetchCardInfo = async () => {
+            try {
+                setLoading(true);
+                const response = await api.get('/questions/active-card-info');
+                setCardInfo(response.data);
+            } catch (error) {
+                console.error('Error fetching card info:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCardInfo();
+    }, []);
 
     const handleCardClick = (cardIndex, isActive) => {
         if (isActive) {
@@ -80,10 +107,13 @@ export default function Dashboard() {
     ];
 
     const getQuizStatus = () => {
-        const sunday10PM = new Date(today);
-        sunday10PM.setDate(today.getDate() + (7 - currentDay)); // Next Sunday
-        sunday10PM.setHours(22, 0, 0, 0); // Set to 10 PM
-        return new Date() <= sunday10PM;
+        if (!cardInfo) return false;
+
+        // Check if current time is within the active card period
+        const now = new Date();
+        const endDate = new Date(cardInfo.endDate);
+
+        return now <= endDate && cardInfo.isActive;
     };
 
     const quizzes = quizDays.map((quiz, index) => {
@@ -95,6 +125,7 @@ export default function Dashboard() {
             ...quiz,
             key: index + 1,
             isActive: getQuizStatus(),
+            questionCount: cardInfo?.cards?.[`card${index + 1}`]?.count || 0,
             date: quizDate.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -195,6 +226,13 @@ export default function Dashboard() {
                                     <p className={`text-sm ${!quiz.isActive ? "text-gray-400" : "text-gray-600"}`}>
                                         {quiz.subtitle}
                                     </p>
+                                    {loading ? (
+                                        <p className="text-xs text-gray-400 mt-1">Loading...</p>
+                                    ) : quiz.questionCount > 0 ? (
+                                        <p className={`text-xs mt-1 ${!quiz.isActive ? "text-gray-400" : "text-blue-600"}`}>
+                                            {quiz.questionCount} questions
+                                        </p>
+                                    ) : null}
                                 </div>
                             </div>
 
@@ -209,7 +247,7 @@ export default function Dashboard() {
                                     {quiz.isActive ? (
                                         <>
                                             <FiClock className="mr-1" />
-                                            Until Sun 10PM
+                                            Active
                                         </>
                                     ) : (
                                         <>

@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const Answer = require('../models/UserAnswer');
+const cardGenerationService = require('./cardGenerationService');
 const logger = require('../utils/logger');
 
 class SchedulerService {
@@ -8,13 +9,45 @@ class SchedulerService {
     }
 
     initializeSchedulers() {
+        // Generate new weekly cards every Sunday at 11:59 PM
+        cron.schedule('59 23 * * 0', this.generateWeeklyCards.bind(this), {
+            scheduled: true,
+            timezone: "Asia/Kolkata"
+        });
+
+        // Deactivate old cards every Monday at 12:01 AM
+        cron.schedule('1 0 * * 1', this.deactivateOldCards.bind(this), {
+            scheduled: true,
+            timezone: "Asia/Kolkata"
+        });
+
         // Schedule weekly cleanup every Monday at 10 PM
         cron.schedule('0 22 * * 1', this.cleanupPreviousWeekAnswers.bind(this), {
             scheduled: true,
             timezone: "Asia/Kolkata"
         });
 
-        logger.info('Scheduled tasks initialized');
+        logger.info('Scheduled tasks initialized: Card generation, cleanup, and deactivation');
+    }
+
+    async generateWeeklyCards() {
+        try {
+            logger.info('Starting weekly card generation...');
+            await cardGenerationService.generateWeeklyCards();
+            logger.info('Weekly card generation completed successfully');
+        } catch (error) {
+            logger.error('Failed to generate weekly cards:', error);
+        }
+    }
+
+    async deactivateOldCards() {
+        try {
+            logger.info('Deactivating old weekly cards...');
+            await cardGenerationService.deactivateOldCards();
+            logger.info('Old cards deactivated successfully');
+        } catch (error) {
+            logger.error('Failed to deactivate old cards:', error);
+        }
     }
 
     async cleanupPreviousWeekAnswers() {
