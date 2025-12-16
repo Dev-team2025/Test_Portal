@@ -76,27 +76,51 @@ app.get("/api/health", (req, res) => {
 });
 
 // Serve static files from the React app in production
-const clientBuildPath = path.join(__dirname, "../client/dist");
-app.use(express.static(clientBuildPath));
+// Try multiple possible paths for the client build
+const fs = require('fs');
+const possiblePaths = [
+    path.join(__dirname, "../client/dist"),           // Local development
+    path.join(__dirname, "../../client/dist"),        // Render deployment structure
+    path.join(process.cwd(), "../client/dist"),       // Alternative path
+    path.join(process.cwd(), "client/dist")           // Root-relative path
+];
+
+let clientBuildPath = null;
+for (const testPath of possiblePaths) {
+    const indexPath = path.join(testPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+        clientBuildPath = testPath;
+        console.log(`✅ Found client build at: ${clientBuildPath}`);
+        break;
+    }
+}
+
+if (!clientBuildPath) {
+    console.error("❌ Client build not found in any of the expected locations:");
+    possiblePaths.forEach(p => console.error(`   - ${p}`));
+    console.error(`Current directory (__dirname): ${__dirname}`);
+    console.error(`Process working directory (cwd): ${process.cwd()}`);
+} else {
+    app.use(express.static(clientBuildPath, {
+        maxAge: '1d',
+        etag: true
+    }));
+}
 
 // Handle React routing - send all non-API requests to index.html
 // Express 5 requires regex pattern instead of "*"
 app.get(/^\/(?!api).*/, (req, res) => {
-    const indexPath = path.join(clientBuildPath, "index.html");
-    const fs = require('fs');
-
-    // Check if index.html exists, if not send a helpful error
-    if (!fs.existsSync(indexPath)) {
-        console.error(`[${new Date().toISOString()}] Error: index.html not found at ${indexPath}`);
-        console.error(`Current directory: ${__dirname}`);
-        console.error(`Looking for client build at: ${clientBuildPath}`);
+    if (!clientBuildPath) {
         return res.status(404).json({
             error: "Client build not found",
             message: "Please build the client application first. Run: cd client && npm install && npm run build",
-            path: clientBuildPath
+            checkedPaths: possiblePaths,
+            currentDir: __dirname,
+            cwd: process.cwd()
         });
     }
 
+    const indexPath = path.join(clientBuildPath, "index.html");
     res.sendFile(indexPath);
 });
 

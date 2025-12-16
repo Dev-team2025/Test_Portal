@@ -5,7 +5,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "build": "cd ../client && npm install && npm run build",
-    "render-build": "npm install && cd ../client && npm install && npm run build && cd ../server"
+    "render-build": "npm install && npm ci --production=false && cd ../client && npm install && npm ci --production=false && npm run build && ls -la dist && cd ../server && echo 'Build completed successfully'"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
