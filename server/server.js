@@ -16,33 +16,37 @@ connectDB();
 // Initialize scheduler service
 new SchedulerService();
 
-// Allowed origins
+// Allowed origins - add your production domain here
 const allowedOrigins = [
-    "http://localhost:5173"
-];
+    "http://localhost:5173",
+    "http://localhost:5000",
+    "http://localhost:3000",
+    "http://157.245.111.79",
+    "http://157.245.111.79:5000",
+    process.env.FRONTEND_URL // Add your production frontend URL in .env
+].filter(Boolean); // Remove undefined values
 
-// ✅ Dynamic CORS Middleware
-app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.header(
-        "Access-Control-Allow-Headers",
-        "Content-Type,Authorization,x-quiz-start-time"
-    );
+// CORS configuration
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, curl, or Postman)
+        if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(req.headers.origin)) {
-        res.header("Access-Control-Allow-Origin", req.headers.origin);
-    }
-
-    // Handle preflight requests
-    if (req.method === "OPTIONS") {
-        return res.sendStatus(200);
-    }
-    next();
-});
-
-// Optional: still use cors() for safety
-app.use(cors({ credentials: true }));
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            // In production, be strict; in development, allow all
+            if (process.env.NODE_ENV === "production") {
+                callback(new Error('Not allowed by CORS'));
+            } else {
+                callback(null, true);
+            }
+        }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-quiz-start-time"]
+}));
 
 // Middleware
 app.use(bodyParser.json({ limit: "10mb" }));

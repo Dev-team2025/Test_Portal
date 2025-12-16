@@ -24,6 +24,7 @@ export default function Dashboard() {
             try {
                 setLoading(true);
                 const response = await api.get('/questions/active-card-info');
+                console.log('Card Info Response:', response.data);
                 setCardInfo(response.data);
             } catch (error) {
                 console.error('Error fetching card info:', error);
@@ -106,14 +107,46 @@ export default function Dashboard() {
         }
     ];
 
-    const getQuizStatus = () => {
-        if (!cardInfo) return false;
+    const getQuizStatus = (quizDayOfWeek) => {
+        if (!cardInfo) {
+            console.log('❌ No cardInfo available');
+            return false;
+        }
 
-        // Check if current time is within the active card period
         const now = new Date();
         const endDate = new Date(cardInfo.endDate);
 
-        return now <= endDate && cardInfo.isActive;
+        console.log(`\n🔍 Checking Card ${quizDayOfWeek === 1 ? 'Monday' : quizDayOfWeek === 3 ? 'Wednesday' : 'Friday'} (day ${quizDayOfWeek})`);
+        console.log('Current time:', now.toLocaleString());
+        console.log('Week ends:', endDate.toLocaleString());
+        console.log('Is active:', cardInfo.isActive);
+
+        // Check if we're still within the week period
+        if (now > endDate || !cardInfo.isActive) {
+            console.log('❌ Failed: Week expired or not active');
+            return false;
+        }
+
+        // Get the start of the current week (Sunday)
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        // Calculate the quiz opening day for this week
+        const quizOpenDate = new Date(startOfWeek);
+        quizOpenDate.setDate(startOfWeek.getDate() + quizDayOfWeek);
+        quizOpenDate.setHours(0, 0, 0, 0);
+
+        console.log('Week starts (Sunday):', startOfWeek.toLocaleString());
+        console.log('Quiz opens on:', quizOpenDate.toLocaleString());
+
+        const isAvailable = now >= quizOpenDate && now <= endDate;
+        console.log(`Result: ${isAvailable ? '✅ AVAILABLE' : '❌ LOCKED'}`);
+
+        // Quiz is available if:
+        // 1. Current time is on or after the quiz day
+        // 2. Current time is before or on the end of weekend (Sunday 11:59 PM)
+        return isAvailable;
     };
 
     const quizzes = quizDays.map((quiz, index) => {
@@ -124,7 +157,7 @@ export default function Dashboard() {
         return {
             ...quiz,
             key: index + 1,
-            isActive: getQuizStatus(),
+            isActive: getQuizStatus(quiz.day),
             questionCount: cardInfo?.cards?.[`card${index + 1}`]?.count || 0,
             date: quizDate.toLocaleDateString('en-US', {
                 weekday: 'short',

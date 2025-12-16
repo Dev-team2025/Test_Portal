@@ -30,8 +30,9 @@ class CardGenerationService {
             }
 
             // Calculate start and end dates (Sunday to Sunday)
-            const startDate = moment().year(targetYear).isoWeek(targetWeek).startOf('isoWeek').subtract(1, 'day'); // Sunday
-            const endDate = moment(startDate).add(6, 'days').endOf('day'); // Next Saturday 11:59 PM
+            // Start from the beginning of the ISO week (Monday) then go back 1 day to Sunday
+            const startDate = moment().year(targetYear).isoWeek(targetWeek).startOf('isoWeek').subtract(1, 'day').startOf('day'); // Sunday 00:00:00
+            const endDate = moment(startDate).add(7, 'days').endOf('day'); // Next Sunday 23:59:59 (end of weekend)
 
             // Get 120 unique questions (40 per card)
             const selectedQuestions = await this.selectUniqueQuestions(120, targetWeek, targetYear);

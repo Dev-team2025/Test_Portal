@@ -7,9 +7,13 @@ import { defineConfig } from "vite"
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-
     proxy: {
-      "/api": "http://localhost:5000",
+      // Proxy API requests to backend during development
+      "/api": {
+        target: process.env.VITE_API_BASE_URL || "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   resolve: {
