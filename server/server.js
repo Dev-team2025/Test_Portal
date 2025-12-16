@@ -4,7 +4,6 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
-const path = require("path");
 const connectDB = require("./config/db");
 const SchedulerService = require("./services/schedulerService");
 
@@ -24,6 +23,7 @@ const allowedOrigins = [
     "http://157.245.111.79",
     "http://157.245.111.79:5000",
     "https://test-portal-srbl.onrender.com",
+    "https://test-portal-one-orcin.vercel.app",  // Vercel frontend
     process.env.FRONTEND_URL // Add your production frontend URL in .env
 ].filter(Boolean); // Remove undefined values
 
@@ -71,57 +71,36 @@ app.get("/api/health", (req, res) => {
         status: "healthy",
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || "development",
-        version: process.env.npm_package_version || "1.0.0"
+        version: process.env.npm_package_version || "1.0.0",
+        mode: "API-only (Frontend hosted on Vercel)"
     });
 });
 
-// Serve static files from the React app in production
-// Try multiple possible paths for the client build
-const fs = require('fs');
-const possiblePaths = [
-    path.join(__dirname, "../client/dist"),           // Local development
-    path.join(__dirname, "../../client/dist"),        // Render deployment structure
-    path.join(process.cwd(), "../client/dist"),       // Alternative path
-    path.join(process.cwd(), "client/dist")           // Root-relative path
-];
+// Root endpoint - API information
+app.get("/", (req, res) => {
+    res.status(200).json({
+        message: "Test Portal API Server",
+        status: "running",
+        version: "1.0.0",
+        frontend: "https://test-portal-one-orcin.vercel.app",
+        endpoints: {
+            health: "/api/health",
+            auth: "/api/auth/*",
+            questions: "/api/questions/*",
+            answers: "/api/answers/*",
+            results: "/api/result/*"
+        },
+        documentation: "This is a backend-only API server. The frontend is hosted separately on Vercel."
+    });
+});
 
-let clientBuildPath = null;
-for (const testPath of possiblePaths) {
-    const indexPath = path.join(testPath, "index.html");
-    if (fs.existsSync(indexPath)) {
-        clientBuildPath = testPath;
-        console.log(`✅ Found client build at: ${clientBuildPath}`);
-        break;
-    }
-}
-
-if (!clientBuildPath) {
-    console.error("❌ Client build not found in any of the expected locations:");
-    possiblePaths.forEach(p => console.error(`   - ${p}`));
-    console.error(`Current directory (__dirname): ${__dirname}`);
-    console.error(`Process working directory (cwd): ${process.cwd()}`);
-} else {
-    app.use(express.static(clientBuildPath, {
-        maxAge: '1d',
-        etag: true
-    }));
-}
-
-// Handle React routing - send all non-API requests to index.html
-// Express 5 requires regex pattern instead of "*"
-app.get(/^\/(?!api).*/, (req, res) => {
-    if (!clientBuildPath) {
-        return res.status(404).json({
-            error: "Client build not found",
-            message: "Please build the client application first. Run: cd client && npm install && npm run build",
-            checkedPaths: possiblePaths,
-            currentDir: __dirname,
-            cwd: process.cwd()
-        });
-    }
-
-    const indexPath = path.join(clientBuildPath, "index.html");
-    res.sendFile(indexPath);
+// 404 handler for undefined routes
+app.use((req, res) => {
+    res.status(404).json({
+        error: "Not Found",
+        message: `Route ${req.method} ${req.path} not found`,
+        availableRoutes: ["/api/health", "/api/auth", "/api/questions", "/api/answers", "/api/result"]
+    });
 });
 
 // Error handler
