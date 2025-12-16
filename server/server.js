@@ -23,6 +23,7 @@ const allowedOrigins = [
     "http://localhost:3000",
     "http://157.245.111.79",
     "http://157.245.111.79:5000",
+    "https://test-portal-srbl.onrender.com",
     process.env.FRONTEND_URL // Add your production frontend URL in .env
 ].filter(Boolean); // Remove undefined values
 
@@ -81,7 +82,22 @@ app.use(express.static(clientBuildPath));
 // Handle React routing - send all non-API requests to index.html
 // Express 5 requires regex pattern instead of "*"
 app.get(/^\/(?!api).*/, (req, res) => {
-    res.sendFile(path.join(clientBuildPath, "index.html"));
+    const indexPath = path.join(clientBuildPath, "index.html");
+    const fs = require('fs');
+
+    // Check if index.html exists, if not send a helpful error
+    if (!fs.existsSync(indexPath)) {
+        console.error(`[${new Date().toISOString()}] Error: index.html not found at ${indexPath}`);
+        console.error(`Current directory: ${__dirname}`);
+        console.error(`Looking for client build at: ${clientBuildPath}`);
+        return res.status(404).json({
+            error: "Client build not found",
+            message: "Please build the client application first. Run: cd client && npm install && npm run build",
+            path: clientBuildPath
+        });
+    }
+
+    res.sendFile(indexPath);
 });
 
 // Error handler
