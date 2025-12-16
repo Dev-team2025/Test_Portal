@@ -45,12 +45,10 @@ const weeklyCardSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Index for quick lookups
-weeklyCardSchema.index({ weekNumber: 1, year: 1 });
-weeklyCardSchema.index({ isActive: 1 });
-weeklyCardSchema.index({ startDate: 1, endDate: 1 });
-
+// Indexes for quick lookups
 // Compound unique index to prevent duplicate week/year combinations
 weeklyCardSchema.index({ weekNumber: 1, year: 1 }, { unique: true });
+weeklyCardSchema.index({ isActive: 1 });
+weeklyCardSchema.index({ startDate: 1, endDate: 1 });
 
 module.exports = mongoose.model("WeeklyCard", weeklyCardSchema);

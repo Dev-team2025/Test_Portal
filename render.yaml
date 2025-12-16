@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: test-portal
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && cd ../client && npm install && npm run build && cd ../server
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRATION
+        value: 1h
+      - key: FRONTEND_URL
+        sync: false
