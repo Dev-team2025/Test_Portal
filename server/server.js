@@ -20,6 +20,10 @@ const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:5000",
     "http://localhost:3000",
+
+    "http://139.59.40.61",
+    "http://139.59.40.61:80",
+    
     "http://157.245.111.79",
     "http://157.245.111.79:5000",
     "https://test-portal-srbl.onrender.com",
@@ -118,6 +122,6 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`);
 });
