@@ -15,9 +15,19 @@ import {
   X
 } from 'lucide-react';
 
-function getCurrentWeekSets(totalSets = 52) {
+function getRelevantWeekSets(totalSets = 52) {
   const now = moment();
-  const weekOfYear = now.isoWeek();
+  const day = now.day(); // 0 = Sunday, 1 = Monday, etc.
+  const hour = now.hour();
+
+  let weekOfYear = now.isoWeek();
+
+  // If it's Sunday after 12 PM or Monday before 12 PM, show previous week's sets
+  // This gives admin time to download reports after the week ends
+  if ((day === 0 && hour >= 12) || (day === 1 && hour < 12)) {
+    weekOfYear = weekOfYear - 1;
+  }
+
   const startSet = ((weekOfYear - 1) * 3) % totalSets + 1;
   return [
     startSet,
@@ -31,7 +41,7 @@ function ResultTable() {
   const [questionDetails, setQuestionDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSet, setSelectedSet] = useState(null);
-  const [currentWeekSets, setCurrentWeekSets] = useState([]);
+  const [availableSets, setAvailableSets] = useState([]);
   const [marksMap, setMarksMap] = useState({});
   const [allColleges, setAllColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState('');
@@ -42,21 +52,35 @@ function ResultTable() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const sets = getCurrentWeekSets();
-    setCurrentWeekSets(sets);
-    setSelectedSet(sets[0]);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSet) return;
-
     const fetchResults = async () => {
       try {
         setLoading(true);
+        // Backend now filters data for the relevant week (Monday 12:00 AM to Sunday 12:00 PM)
         const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/result/all`);
         const answers = response.data.answers || [];
         const marks = response.data.marksMap || {};
         setMarksMap(marks);
+
+        // Get unique set numbers from the filtered data
+        const setNumbers = new Set();
+        answers.forEach((ans) => {
+          if (ans.setNumber) {
+            setNumbers.add(ans.setNumber);
+          }
+        });
+
+        const sortedSets = Array.from(setNumbers).sort((a, b) => a - b);
+        setAvailableSets(sortedSets);
+
+        // Set the first available set as default if not already set
+        if (!selectedSet && sortedSets.length > 0) {
+          setSelectedSet(sortedSets[0]);
+        }
+
+        if (!selectedSet) {
+          setLoading(false);
+          return;
+        }
 
         const grouped = {};
         const questionMap = new Map();
@@ -64,7 +88,7 @@ function ResultTable() {
         answers.forEach((ans) => {
           const userId = ans.userId?._id;
           const question = ans.questionId;
-          if (!userId || !question?._id || ans.setNumber !== question.set || ans.setNumber !== selectedSet) return;
+          if (!userId || !question?._id || ans.setNumber !== selectedSet) return;
 
           const qid = question._id;
           if (!questionMap.has(qid)) {
@@ -212,13 +236,17 @@ function ResultTable() {
         <div className="flex items-center gap-2">
           <label className="font-medium">Set:</label>
           <select
-            value={selectedSet}
+            value={selectedSet || ''}
             onChange={(e) => setSelectedSet(Number(e.target.value))}
             className="border border-gray-300 rounded p-2"
           >
-            {currentWeekSets.map((set) => (
-              <option key={set} value={set}>Card {set}</option>
-            ))}
+            {availableSets.length === 0 ? (
+              <option value="">No sets available</option>
+            ) : (
+              availableSets.map((set) => (
+                <option key={set} value={set}>Set {set}</option>
+              ))
+            )}
           </select>
         </div>
 
