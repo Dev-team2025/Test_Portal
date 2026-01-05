@@ -111,8 +111,9 @@ const Quiz = () => {
             setLoading(true);
             setError(null);
 
-            if (!setKey || !['1', '2', '3'].includes(setKey)) {
-                throw new Error("Invalid quiz set selected");
+            const setNumber = parseInt(setKey);
+            if (!setKey || isNaN(setNumber) || setNumber < 1 || setNumber > 52) {
+                throw new Error("Invalid quiz set selected. Set must be between 1 and 52");
             }
 
             // Store start time in localStorage

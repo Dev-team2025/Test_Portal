@@ -2,33 +2,33 @@ const Question = require("../models/Questions");
 const cardGenerationService = require("../services/cardGenerationService");
 
 /**
- * Get questions for a specific weekly card (1, 2, or 3)
- * This replaces the old set-based system with the new card-based system
+ * Get questions for a specific set (1-52)
+ * Fetches questions directly from the database by set number
  */
 exports.getWeeklyQuestions = async (req, res) => {
     try {
-        const cardNumber = parseInt(req.query.card);
+        const setNumber = parseInt(req.query.card) || parseInt(req.query.set);
 
-        if (!cardNumber || ![1, 2, 3].includes(cardNumber)) {
+        if (!setNumber || setNumber < 1 || setNumber > 52) {
             return res.status(400).json({
-                error: "Invalid card number. Must be 1, 2, or 3"
+                error: "Invalid set number. Must be between 1 and 52"
             });
         }
 
-        console.log(`Fetching questions for card ${cardNumber}`);
+        console.log(`Fetching questions for set ${setNumber}`);
 
-        // Get questions for the specified card
-        const questions = await cardGenerationService.getCardQuestions(cardNumber);
+        // Get questions for the specified set directly from database
+        const questions = await Question.find({ set: setNumber }).sort({ createdAt: 1 });
 
         if (!questions || questions.length === 0) {
-            console.warn(`⚠️ No questions found for card ${cardNumber}`);
+            console.warn(`⚠️ No questions found for set ${setNumber}`);
             return res.status(404).json({
-                error: "No questions available for this card",
+                error: "No questions available for this set",
                 message: "Please contact the administrator"
             });
         }
 
-        console.log(`✓ Found ${questions.length} questions for card ${cardNumber}`);
+        console.log(`✓ Found ${questions.length} questions for set ${setNumber}`);
 
         res.json(questions);
 
